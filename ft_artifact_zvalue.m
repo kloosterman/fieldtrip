@@ -486,6 +486,14 @@ opt.hdr          = hdr;
 opt.numtrl       = size(trl,1);
 opt.quit         = 0;
 opt.threshold    = cfg.artfctdef.zvalue.cutoff;
+% TOEGEVOEGD DOOR JOHANNES OM OP DE abs(min(Z)+cutoff) TE THRESHOLDEN
+if opt.threshold < 0
+    if thresholdsum 
+        opt.threshold = median([zsum{:}]) + abs(min([zsum{:}])-median([zsum{:}])) + abs(cfg.artfctdef.zvalue.cutoff);
+    else 
+        opt.threshold = median([zmax{:}]) + abs(min([zmax{:}])-median([zmax{:}])) + abs(cfg.artfctdef.zvalue.cutoff);
+    end
+end
 opt.thresholdsum = thresholdsum;
 opt.trialok      = true(1,opt.numtrl);  % OK by means of objective criterion
 opt.keep         = zeros(1,opt.numtrl); % OK overruled by user +1 to keep, -1 to reject, start all zeros for callback to work
