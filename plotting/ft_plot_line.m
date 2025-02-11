@@ -10,7 +10,7 @@ function h = ft_plot_line(X, Y, varargin)
 %   'color'           =
 %   'linestyle'       =
 %   'linewidth'       =
-%   'tag'             = string, the name assigned to the object. All tags with the same name can be deleted in a figure, without deleting other parts of the figure.
+%   'tag'             = string, the tag assigned to the plotted elements (default = '')
 %
 % It is possible to plot the object in a local pseudo-axis (c.f. subplot), which is specfied as follows
 %   'hpos'            = horizontal position of the center of the local axes
@@ -22,7 +22,7 @@ function h = ft_plot_line(X, Y, varargin)
 %
 % See also FT_PLOT_BOX, FT_PLOT_CROSSHAIR
 
-% Copyrights (C) 2009-2011, Robert Oostenveld
+% Copyrights (C) 2009-2022, Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
@@ -41,8 +41,6 @@ function h = ft_plot_line(X, Y, varargin)
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
 % $Id$
-
-ws = warning('on', 'MATLAB:divideByZero');
 
 % get the optional input arguments
 hpos        = ft_getopt(varargin, 'hpos');
@@ -113,7 +111,4 @@ else
   
 end % shortcut
 
-h = line(X, Y, 'Color', color, 'LineStyle', linestyle, 'LineWidth', linewidth);
-set(h, 'tag', tag);
-
-warning(ws); % revert to original state
+h = line(X, Y, 'Color', color, 'LineStyle', linestyle, 'LineWidth', linewidth, 'tag', tag);

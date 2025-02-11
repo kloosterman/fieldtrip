@@ -1,8 +1,9 @@
 function test_ft_channelselection
 
-% MEM 2gb
+% MEM 1gb
 % WALLTIME 00:10:00
 % DEPENDENCY ft_senstype ref_datasets
+% DATA private
 
 datasets = ref_datasets;
 
@@ -16,7 +17,7 @@ for i=1:size(datasets,2)
   end
   
   if ~ft_senstype(hdr, datasets(i).senstype)
-    error(['incorrect senstype detection: ' datasets(i).datatype]);
+    error(['incorrect senstype detection: ' datasets(i).senstype]);
   else
     type=ft_senstype(hdr);
   end

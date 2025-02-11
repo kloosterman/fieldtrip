@@ -40,9 +40,9 @@ dataformat   = ft_getopt(varargin, 'dataformat'         );
 begsample    = ft_getopt(varargin, 'begsample'          );
 endsample    = ft_getopt(varargin, 'endsample'          );
 chanindx     = ft_getopt(varargin, 'chanindx'           ); % specify -1 in case you don't want to detect triggers
-detectflank  = ft_getopt(varargin, 'detectflank'        ); % can be up, updiff, down, downdiff, both, any, biton, bitoff
+detectflank  = ft_getopt(varargin, 'detectflank'        ); % can be up, updiff, down, downdiff, both, any, biton, bitoff, optionally appended with _split16bit
 denoise      = ft_getopt(varargin, 'denoise',      true );
-trigshift    = ft_getopt(varargin, 'trigshift',    false); % causes the value of the trigger to be obtained from a sample that is shifted N samples away from the actual flank
+trigshift    = ft_getopt(varargin, 'trigshift',    0); % causes the value of the trigger to be obtained from a sample that is shifted N samples away from the actual flank
 trigpadding  = ft_getopt(varargin, 'trigpadding',  true );
 fixctf       = ft_getopt(varargin, 'fixctf',       false);
 fixneuromag  = ft_getopt(varargin, 'fixneuromag',  false);
@@ -51,6 +51,7 @@ fixbiosemi   = ft_getopt(varargin, 'fixbiosemi',   false);
 fixartinis   = ft_getopt(varargin, 'fixartinis',   false);
 fixstaircase = ft_getopt(varargin, 'fixstaircase', false);
 fixhomer     = ft_getopt(varargin, 'fixhomer',     false);
+combinebinary = ft_getopt(varargin, 'combinebinary', false);
 threshold    = ft_getopt(varargin, 'threshold'          );
 
 if isempty(hdr)
@@ -79,7 +80,7 @@ if isempty(chanindx) || isempty(intersect(chanindx, 1:hdr.nChans))
   return
 else
   % read the trigger channels as raw data, here we can safely assume that it is continuous
-  dat = ft_read_data(filename, 'header', hdr, 'dataformat', dataformat, 'begsample', begsample, 'endsample', endsample, 'chanindx', chanindx, 'checkboundary', 0);
+  dat = ft_read_data(filename, 'header', hdr, 'dataformat', dataformat, 'begsample', begsample, 'endsample', endsample, 'chanindx', chanindx, 'checkboundary', 0, 'checkmaxfilter', 0);
 end
 
 % detect situations where the channel value changes almost at every sample, which are likely to be noise
@@ -156,7 +157,7 @@ end
 if strncmpi(dataformat, 'neuromag', 8) && ~fixneuromag
   for k = 1:size(dat,1)
     switch hdr.chantype{chanindx(1)}
-      case 'binary trigger'
+      case 'digital trigger'
         if any(dat(k,:)<0)
           dat(k,:) = double(typecast(int16(dat(k,:)), 'uint16'));
         end
@@ -214,8 +215,10 @@ if ~isempty(threshold)
     for i = 1:size(dat,1)
       threshold_value = eval([threshold '(dat(i,:))']);
       % discretize the signal
-      dat(i,dat(i,:)< threshold_value) = 0;
-      dat(i,dat(i,:)>=threshold_value) = 1;
+      below = dat(i,:)< threshold_value;
+      above = dat(i,:)>=threshold_value;
+      dat(i,below) = 0;
+      dat(i,above) = 1;
     end
   else
     % discretize the signal
@@ -224,24 +227,52 @@ if ~isempty(threshold)
   end
 end
 
+if combinebinary
+  % this can only be done after thresholding
+  % combines the single binary channels into a numbered trigger
+  newdat = zeros(1, size(dat,2));
+  for i = 1:size(dat,1)
+    newdat = newdat + dat(i,:).*2^(i-1);
+  end
+  dat = newdat; clear newdat
+  hdr.label{chanindx(1)} = 'combined_binary_trigger';
+end
+
 if isempty(dat)
   % either no trigger channels were selected, or no samples
   return
 end
 
 if isempty(detectflank)
-  % look at the first value in the trigger channel to determine whether the trigger is pulled up or down
-  % this fails if the first sample is zero and if the trigger values are negative
-  if all(dat(:,1)==0)
+  if all((dat(:,1)-mode(dat,2))>=0)
+    % the occasional TTL pulses are upward going
     detectflank = 'up';
-  else
+  elseif all((dat(:,1)-mode(dat,2))<=0)
+    % the occasional TTL pulses are downward going
     detectflank = 'down';
+  else
+    ft_error('cannot determine ''detectflank'' automatically, please specify this option in cfg.trialdef.detectflank');
   end
 end
 
-for i=1:length(chanindx)
+label = hdr.label(chanindx);
+if contains(detectflank, 'split16bit')
+  % split the trigger channel into lower and higher (bitshifted) trigger channels. 
+  % this is the same functionality as read_ctf_trigger, consider merging
+  dat_high = fix(dat / 2^16);
+  dat_low  = double(bitand(uint32(dat), 2^16-1));
+  dat      = [dat_low; dat_high];
+  
+  label = cat(1, cellfun(@sprintf, repmat({'%s_low16bit'},numel(label),1), label, 'UniformOutput', false), ...
+    cellfun(@sprintf, repmat({'%s_high16bit'},numel(label),1), label, 'UniformOutput', false));
+
+  tok = tokenize(detectflank, '_');
+  detectflank = tok{1};
+end
+
+for i = 1:size(dat,1)
   % process each trigger channel independently
-  channel = hdr.label{chanindx(i)};
+  channel = label{i};
   trig    = dat(i,:);
   
   if trigpadding

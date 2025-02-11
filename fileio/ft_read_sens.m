@@ -13,6 +13,7 @@ function [sens] = ft_read_sens(filename, varargin)
 %   'senstype'       = string, can be 'eeg', 'meg' or 'nirs', specifies which type of sensors to read from the file (default = 'eeg')
 %   'coordsys'       = string, 'head' or 'dewar' (default = 'head')
 %   'coilaccuracy'   = scalar, can be empty or a number (0, 1 or 2) to specify the accuracy (default = [])
+%   'coildeffile'    = string, can be empty, to specify a coil_def.dat file if coilaccuracy ~= []
 %   'readbids'       = string, 'yes', no', or 'ifmakessense', whether to read information from the BIDS sidecar files (default = 'ifmakessense')
 %
 % The electrode, gradiometer and optode structures are defined in more detail
@@ -28,7 +29,7 @@ function [sens] = ft_read_sens(filename, varargin)
 %
 % See also FT_READ_HEADER, FT_DATATYPE_SENS, FT_PREPARE_VOL_SENS, FT_COMPUTE_LEADFIELD,
 
-% Copyright (C) 2005-2021 Robert Oostenveld
+% Copyright (C) 2005-2022 Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
@@ -56,6 +57,7 @@ fileformat     = ft_getopt(varargin, 'fileformat', ft_filetype(filename));
 senstype       = ft_getopt(varargin, 'senstype');         % can be eeg/meg/nirs, default is automatic and eeg when both meg+eeg are present
 coordsys       = ft_getopt(varargin, 'coordsys', 'head'); % this is used for ctf and neuromag_mne, it can be head or dewar
 coilaccuracy   = ft_getopt(varargin, 'coilaccuracy');     % empty, or a number between 0 to 2
+coildeffile    = ft_getopt(varargin, 'coildeffile');      % empty, or a filename
 readbids       = ft_getopt(varargin, 'readbids', 'ifmakessense');
 
 realtime = any(strcmp(fileformat, {'fcdc_buffer', 'ctf_shm', 'fcdc_mysql'}));
@@ -113,7 +115,7 @@ switch fileformat
   % hence we use the standard fieldtrip/fileio ft_read_header function
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   case {'ctf_ds', 'ctf_res4', 'ctf_old', 'neuromag_fif', 'neuromag_mne', '4d', '4d_pdf', '4d_m4d', '4d_xyz', 'yokogawa_ave', 'yokogawa_con', 'yokogawa_raw', 'ricoh_ave', 'ricoh_con', 'itab_raw' 'itab_mhd', 'netmeg'}
-    hdr = ft_read_header(filename, 'headerformat', fileformat, 'coordsys', coordsys, 'coilaccuracy', coilaccuracy, 'readbids', readbids);
+    hdr = ft_read_header(filename, 'headerformat', fileformat, 'coordsys', coordsys, 'coilaccuracy', coilaccuracy, 'coildeffile', coildeffile, 'readbids', readbids);
     % sometimes there can also be electrode position information in the header
     if isfield(hdr, 'elec') && isfield(hdr, 'grad')
       if isempty(senstype)
@@ -162,10 +164,17 @@ switch fileformat
     fid = fopen_or_error(filename);
     % these files seem to come in different formats with 3, 4 or 5 columns
     % see http://wiki.besa.de/index.php?title=Channel_Definition_File_Formats
-    % read the first line to determine the number of columns
-    format = length(strsplit(deblank2(fgetl(fid))));
+    % read the first two lines to determine the number of columns
+    columns1 = length(strsplit(strtrim(fgetl(fid))));
+    columns2 = length(strsplit(strtrim(fgetl(fid))));
     fseek(fid, 0, 'bof');
-    switch format
+    if columns1==1 && columns2>1
+      % EEGLAB includes ELP files that start with a line with the number of electrodes 
+      % skip the first line
+      columns1 = columns2;
+      fgetl(fid);
+    end
+    switch columns1
       case 3
         % 3-column: label, azimuth, elevation
         tmp = textscan(fid, '%s%f%f');
@@ -219,12 +228,12 @@ switch fileformat
     end
     [nchan,nrow] = size(tmp);
     if nrow==3
-      sens.pnt = tmp;
+      sens.pos = tmp;
     elseif nrow==9
-      pnt1 = tmp(:,1:3);  % bottom coil
-      pnt2 = tmp(:,4:6);  % top coil
+      pos1 = tmp(:,1:3);  % bottom coil
+      pos2 = tmp(:,4:6);  % top coil
       ori  = tmp(:,7:9);  % orientation of bottom coil
-      sens.pnt = [pnt1; pnt2];
+      sens.pos = [pos1; pos2];
       sens.ori = [ori; ori];
       sens.tra = [eye(nchan) -eye(nchan)];
     else
@@ -307,18 +316,18 @@ switch fileformat
   case 'neuromag_mne_grad'
     % the file can contain both, force reading the gradiometer info
     % note that this functionality overlaps with senstype=eeg/meg
-    hdr = ft_read_header(filename, 'headerformat', 'neuromag_mne', 'coordsys', coordsys, 'coilaccuracy', coilaccuracy);
+    hdr = ft_read_header(filename, 'headerformat', 'neuromag_mne', 'coordsys', coordsys, 'coilaccuracy', coilaccuracy, 'coildeffile', coildeffile);
     sens = hdr.grad;
     
   case 'neuromag_mne_elec'
     % the file can contain both, force reading the electrode info
     % note that this functionality overlaps with senstype=eeg/meg
-    hdr = ft_read_header(filename, 'headerformat', 'neuromag_mne', 'coordsys', coordsys, 'coilaccuracy', coilaccuracy);
+    hdr = ft_read_header(filename, 'headerformat', 'neuromag_mne', 'coordsys', coordsys, 'coilaccuracy', coilaccuracy, 'coildeffile', coildeffile);
     sens = hdr.elec;
     
   case {'spmeeg_mat', 'eeglab_set'}
     % this is for EEG formats where electrode positions can be stored with the data
-    hdr = ft_read_header(filename, 'coordsys', coordsys, 'coilaccuracy', coilaccuracy);
+    hdr = ft_read_header(filename, 'coordsys', coordsys, 'coilaccuracy', coilaccuracy, 'coildeffile', coildeffile);
     if isfield(hdr, 'grad')
       sens = hdr.grad;
     elseif isfield(hdr, 'elec')
@@ -329,10 +338,10 @@ switch fileformat
     
   case 'polhemus_fil'
     % these are created at the FIL in London with a polhemus tracker
-    [sens.fid.pnt, sens.pnt, sens.fid.label] = read_polhemus_fil(filename, 0);
+    [sens.fid.pos, sens.pos, sens.fid.label] = read_polhemus_fil(filename, 0);
     % the file does not have channel labels in it
     ft_warning('no channel names in polhemus file, using numbers instead');
-    for i=1:size(sens.pnt, 1)
+    for i=1:size(sens.pos, 1)
       sens.label{i} = sprintf('%03d', i);
     end
     
@@ -348,10 +357,13 @@ switch fileformat
       % read whatever variable is in the file, this will error if the file contains multiple variables
       sens = loadvar(matfile);
     end
+    if ft_datatype(sens, 'layout')
+      ft_error('"%s" contains a 2D layout for plotting, not 3D electrode positions', filename);
+    end
     
   case 'zebris_sfp'
     % these are created by a Zebris tracker, at CRC in Liege at least.
-    [sens.fid.pnt, sens.chanpos, sens.fid.label, sens.label] = read_zebris(filename, 0);
+    [sens.fid.pos, sens.chanpos, sens.fid.label, sens.label] = read_zebris(filename, 0);
     % convert to columns
     sens.label = sens.label(:);
     sens.fid.label = sens.fid.label(:);
@@ -384,7 +396,7 @@ switch fileformat
       sens.label      = l(~sel);
       sens.elecpos    = [x(~sel) y(~sel) z(~sel)];
       sens.fid.label  = l(sel);
-      sens.fid.pnt    = [x(sel) y(sel) z(sel)];
+      sens.fid.pos    = [x(sel) y(sel) z(sel)];
     end
     
   case {'localite_pos', 'localite_ins'}
@@ -539,7 +551,7 @@ switch fileformat
     sens.chanpos = [x y z];
     
   case '3dslicer_fscv'
-    csvData = readtable(filename,'FileType','text');
+    csvData = readtable(filename, 'FileType', 'text');
     sens.label = csvData.label;
     sens.elecpos = [csvData.x,csvData.y,csvData.z];
     
@@ -562,8 +574,8 @@ switch fileformat
     sens_i=0;
     for i=1:hdr.nChans
       if string(hdr.chantype{i})==upper(senstype)
-        sens_i=sens_i+1;
-        sens.chantype{sens_i,1}=hdr.chantype{i};
+        sens_i = sens_i+1;
+        sens.chantype{sens_i,1} = hdr.chantype{i};
         try
           sens.chanpos(sens_i,1:3) =  h5read(filename,['/config/channels/' hdr.label{i} '/position']);
           sens.chanori(sens_i,1:3) =  h5read(filename,['/config/channels/' hdr.label{i} '/orientation']);
@@ -584,14 +596,14 @@ switch fileformat
     sens.tra  = eye(sens_i);
     sens.type= 'yorkinstruments248';
     if isempty(coordsys)
-      coordsys='dewar';
+      coordsys = 'dewar';
     end
-    if strcmp(coordsys,'head')
+    if strcmp(coordsys, 'head')
       try
-        tCCStoMegscanScs = h5read(filename,[strcat('/acquisitions/',char(string(acquisition))) '/ccs_to_scs_transform']);
-        T = maketform('affine',tCCStoMegscanScs);
-        sens.coilpos=tformfwd(T,sens.chanpos(:,1),sens.chanpos(:,2),sens.coilpos(:,3));
-        R = tCCStoMegscanScs(1:3,1:3); %(mm)
+        tCCStoMegscanScs = h5read(filename, [strcat('/acquisitions/', char(string(acquisition))) '/ccs_to_scs_transform']);
+        T = maketform('affine', tCCStoMegscanScs);
+        sens.coilpos = tformfwd(T, sens.chanpos(:,1), sens.chanpos(:,2), sens.coilpos(:,3));
+        R = tCCStoMegscanScs(1:3,1:3); % (mm)
         sens.coilori =  sens.coilori * R;
         sens.chanpos=sens.coilpos;
         sens.chanori=sens.coilori;

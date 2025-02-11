@@ -1,8 +1,9 @@
 function test_bug131
 
-% MEM 2gb
+% MEM 1gb
 % WALLTIME 00:10:00
 % DEPENDENCY ft_prepare_leadfield
+% DATA no
 
 % test the issue related to the scaling of the leadfields in the different implementations
 
@@ -21,7 +22,7 @@ vol2.unit = 'm';
 vol2.type = 'singleshell';
 
 % create sensor array
-nrm = normals(pnt,tri,'vertex');
+nrm = surface_normals(pnt,tri,'vertex');
 grad.pnt = pnt.*10;
 grad.pnt(pnt(:,3)<0,:) = [];
 grad.ori = nrm(pnt(:,3)>=0,:);

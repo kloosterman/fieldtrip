@@ -1,8 +1,9 @@
 function test_ft_selectdata
 
-% MEM 2gb
+% MEM 1gb
 % WALLTIME 00:10:00
 % DEPENDENCY ft_selectdata ft_selectdata_old ft_selectdata_new ft_appendfreq
+% DATA no
 
 timelock1 = [];
 timelock1.label = {'1' '2'};
@@ -300,3 +301,48 @@ if false
   assert(size(output.crsspctrm, 3)==3, 'incorrect size'); % freq
 end
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% this part of the script tests the functionality of ft_selectdata with union/intersect on raw data
+
+data = [];
+data.trial{1} = randn(2,10);
+data.time{1}  = -5:4;
+data.trial{2} = randn(2,10);
+data.time{2}  = 1:10;
+data.label    = {'chan01';'chan02'};
+
+cfg = [];
+cfg.select = 'intersect';
+datasel1 = ft_selectdata(cfg, data);
+
+cfg.select = 'union';
+ok = true;
+try
+  datasel2 = ft_selectdata(cfg, data);
+catch
+  ok = false;
+end
+assert(~ok, 'ft_selectdata with raw input and union selection should fail');
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% this part of the script tests a specific latency selection on raw data, causing
+% some of the trials being empty
+
+cfg = [];
+cfg.latency = [5 10];
+datasel3 = ft_selectdata(cfg, data);
+
+% new behavior
+%assert(numel(datasel3.trial)== 1);
+assert(numel(datasel3.trial)== 2);
+assert(numel(datasel3.trial{1})==0);
+
+% add a sampleinfo
+data.sampleinfo = [1 10;11 20];
+datasel4 = ft_selectdata(cfg, data);
+% new behavior
+%assert(size(datasel4.sampleinfo,1)==1);
+assert(size(datasel4.sampleinfo,1)==2);
+assert(all(~isfinite(datasel4.sampleinfo(1,:))));
+
+ 

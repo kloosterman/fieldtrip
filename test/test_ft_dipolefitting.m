@@ -1,8 +1,9 @@
 function test_ft_dipolefitting
 
 % WALLTIME 00:20:00
-% MEM 2gb
+% MEM 1gb
 % DEPENDENCY ft_dipolefitting ft_headmodel_concentricspheres
+% DATA no
 % DATATYPE comp timelock freq
 
 fs = 500;
@@ -28,10 +29,18 @@ for i=1:nchan
 end
 data.elec.chanpos = data.elec.elecpos;
 
+% make an explicit geometry with 4 surfaces 
+% the radius of each follows the BESA defaults
 geometry = [];
-geometry.pos = data.elec.elecpos;
-geometry.unit = data.elec.unit;
-% fit a 4-sphere concentric model to the geometry
+geometry(1).pos  = data.elec.elecpos*71/85; % brain
+geometry(1).unit = data.elec.unit;
+geometry(2).pos  = data.elec.elecpos*72/85; % csf
+geometry(2).unit = data.elec.unit;
+geometry(3).pos  = data.elec.elecpos*79/85; % skull
+geometry(3).unit = data.elec.unit;
+geometry(4).pos  = data.elec.elecpos*85/85; % scalp
+geometry(4).unit = data.elec.unit;
+% fit a 4-sphere concentric model to the geometries
 headmodel = ft_headmodel_concentricspheres(geometry, 'conductivity', [0.33 1.00 0.042 0.33]);
 
 % test for comp type
@@ -62,6 +71,24 @@ cfg.resolution = 1; %cm
 cfg.latency = [0 1];
 cfg.model = 'regional';
 cfg.headmodel = headmodel;
+sourceout = ft_dipolefitting(cfg, timelock);
+
+% test for precomputed grid, without nonlinear optimization
+cfg = [];
+cfg.resolution = 1;
+cfg.headmodel  = headmodel;
+sourcemodel    = ft_prepare_sourcemodel(cfg);
+cfg.sourcemodel = sourcemodel;
+cfg.elec        = data.elec;
+leadfield       = ft_prepare_leadfield(cfg);
+
+cfg = [];
+cfg.model = 'regional';
+cfg.headmodel = headmodel;
+cfg.sourcemodel = leadfield;
+cfg.nonlinear = 'no';
+cfg.model = 'regional';
+cfg.latency = [0 1];
 sourceout = ft_dipolefitting(cfg, timelock);
 
 % test for freq type

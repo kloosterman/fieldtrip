@@ -74,7 +74,6 @@ ft_preamble init
 ft_preamble debug
 ft_preamble loadvar varargin
 ft_preamble provenance varargin
-ft_preamble trackconfig
 
 % the ft_abort variable is set to true or false in ft_preamble_init
 if ft_abort
@@ -88,16 +87,16 @@ end
 
 % check if the input data is valid for this function
 for i=1:length(varargin)
-  if isfield(varargin{i},'trial') && isfield(varargin{i},'avg') % see bug2372 (dieloz)
+  if isfield(varargin{i}, 'trial') && isfield(varargin{i}, 'avg') % see bug2372 (dieloz)
     varargin{i} = rmfield(varargin{i}, 'trial');
     varargin{i}.dimord = 'chan_time';
     ft_warning('not using the trials, using the single-subject average to compute the grand average');
-  else
-    if isfield(varargin{i},'trial') && ~isfield(varargin{i},'avg')
-      ft_error('input structure %d does not contain an average, use FT_TIMELOCKANALYSIS first', i);
-    end
   end
   varargin{i} = ft_checkdata(varargin{i}, 'datatype', 'timelock', 'feedback', 'no');
+  % ensure that it contains an average
+  if ~isfield(varargin{i}, 'avg')
+    ft_error('input structure %d does not contain an average, use FT_TIMELOCKANALYSIS first', i);
+  end
 end
 
 % check if the input cfg is valid for this function
@@ -126,7 +125,7 @@ end
 
 % select trials and channels of interest
 orgcfg = cfg;
-tmpcfg = keepfields(cfg, {'parameter', 'channel', 'tolerance', 'latency', 'showcallinfo', 'trackcallinfo', 'trackconfig', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo'});
+tmpcfg = keepfields(cfg, {'parameter', 'channel', 'tolerance', 'latency', 'showcallinfo', 'trackcallinfo', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo', 'checksize'});
 [varargin{:}] = ft_selectdata(tmpcfg, varargin{:});
 % restore the provenance information
 [cfg, varargin{:}] = rollback_provenance(cfg, varargin{:});
@@ -259,7 +258,6 @@ end
 
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
-ft_postamble trackconfig
 ft_postamble previous   varargin
 ft_postamble provenance grandavg
 ft_postamble history    grandavg

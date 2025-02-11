@@ -15,10 +15,10 @@ function ft_plot_matrix(varargin)
 %   'clim'            = 1x2 vector with color limits (default is automatic)
 %   'highlight'       = a logical matrix of size C, where 0 means that the corresponding values in C are highlighted according to the highlightstyle
 %   'highlightstyle'  = can be 'saturation', 'opacity', 'outline' or 'colormix' (default = 'opacity')
-%   'box'             = draw a box around the local axes, can be 'yes' or 'no'
-%   'tag'             = string, the name assigned to the object. All tags with the same name can be deleted in a figure, without deleting other parts of the figure.
+%   'tag'             = string, the tag assigned to the plotted elements (default = '')
 %
 % It is possible to plot the object in a local pseudo-axis (c.f. subplot), which is specfied as follows
+%   'box'             = draw a box around the local axes, can be 'yes' or 'no'
 %   'hpos'            = horizontal position of the center of the local axes
 %   'vpos'            = vertical position of the center of the local axes
 %   'width'           = width of the local axes
@@ -39,7 +39,7 @@ function ft_plot_matrix(varargin)
 %
 % See also FT_PLOT_VECTOR, IMAGESC, SURF
 
-% Copyrights (C) 2009-2011, Robert Oostenveld
+% Copyrights (C) 2009-2022, Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
@@ -58,8 +58,6 @@ function ft_plot_matrix(varargin)
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
 % $Id$
-
-ws = warning('on', 'MATLAB:divideByZero');
 
 if nargin>2 && all(cellfun(@isnumeric, varargin(1:3)))
   % the function was called like imagesc(x, y, c, ...)
@@ -331,5 +329,3 @@ if box
   boxposition(4) = vpos + height/2;
   ft_plot_box(boxposition);
 end
-
-warning(ws); % revert to original state

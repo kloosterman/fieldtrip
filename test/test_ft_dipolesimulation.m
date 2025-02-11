@@ -1,8 +1,9 @@
 function test_ft_dipolesimulation
 
 % WALLTIME 00:10:00
-% MEM 2gb
+% MEM 1gb
 % DEPENDENCY ft_dipolesimulation
+% DATA no
 
 nchan = 32;
 % construct a set of electrodes randomly distributed over the upper hemisphere
@@ -19,9 +20,11 @@ elec.chanpos = elec.elecpos;
 geometry = [];
 geometry.pos = elec.elecpos;
 geometry.unit = elec.unit;
+
+% fit a single sphere to the electrodes
 cfg = [];
-cfg.conductivity = [0.33 1.00 0.042 0.33];
-headmodel = ft_headmodel_concentricspheres(geometry, 'conductivity', cfg.conductivity);
+cfg.conductivity = 0.33;
+headmodel = ft_headmodel_singlesphere(geometry, 'conductivity', cfg.conductivity);
 
 cfg = [];
 cfg.dip.pos = randn(2,3);
@@ -31,4 +34,4 @@ cfg.dip.phase = [0 45];
 cfg.dip.amplitude = [3 5];
 cfg.headmodel = headmodel;
 cfg.elec = elec;
-cfgout = ft_dipolesimulation(cfg);
+data = ft_dipolesimulation(cfg);

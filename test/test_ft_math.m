@@ -1,8 +1,9 @@
 function test_ft_math
 
-% MEM 2gb
+% MEM 1gb
 % WALLTIME 00:10:00
 % DEPENDENCY ft_math
+% DATA no
 
 %% create some test data
 raw1 = [];
@@ -45,7 +46,6 @@ end
 
 cfg=[];
 cfg.showcallinfo = 'no';
-cfg.trackconfig  = 'no';
 cfg.parameter = 'trial';
 
 cfg.operation = 'log10';
@@ -75,7 +75,6 @@ assert(isfield(tmp, cfg.parameter), 'the output parameter is missing');
 
 cfg = [];
 cfg.showcallinfo = 'no';
-cfg.trackconfig  = 'no';
 cfg.parameter    = 'avg';
 
 cfg.operation = 'log10';
@@ -110,7 +109,6 @@ assert(isfield(tmp, 'dimord'), 'the output dimord is missing');
 
 cfg = [];
 cfg.showcallinfo = 'no';
-cfg.trackconfig  = 'no';
 cfg.parameter    = {'avg', 'var'};
 
 cfg.operation = 'log10';
@@ -125,7 +123,6 @@ assert(isequal(tmp.avg, log10(timelock3.avg)));
 
 cfg = [];
 cfg.showcallinfo = 'no';
-cfg.trackconfig  = 'no';
 cfg.parameter    = 'mom'; % note that this is {pos}_ori_time
 
 cfg.operation = 'log10';
@@ -160,7 +157,6 @@ assert(isfield(tmp, [cfg.parameter 'dimord']), 'the output dimord is missing');
 
 cfg = [];
 cfg.showcallinfo = 'no';
-cfg.trackconfig  = 'no';
 cfg.parameter    = 'avg';
 
 cfg.operation = 'add';
@@ -189,7 +185,6 @@ assert(isfield(tmp, 'dimord'), 'the output dimord is missing');
 
 cfg = [];
 cfg.showcallinfo = 'no';
-cfg.trackconfig  = 'no';
 cfg.parameter    = 'mom';
 
 cfg.operation = 'add';
@@ -218,7 +213,6 @@ assert(isfield(tmp, [cfg.parameter 'dimord']), 'the output dimord is missing');
 
 cfg = [];
 cfg.showcallinfo = 'no';
-cfg.trackconfig  = 'no';
 cfg.parameter    = 'avg';
 
 cfg.operation = 'add';
@@ -237,7 +231,6 @@ assert(isfield(tmp, 'dimord'), 'the output dimord is missing');
 
 cfg = [];
 cfg.showcallinfo = 'no';
-cfg.trackconfig  = 'no';
 cfg.parameter    = 'mom';
 
 cfg.operation = 'add';
@@ -348,7 +341,6 @@ assert(tmp.mom{1}(1)==9);
 
 cfg = [];
 cfg.showcallinfo = 'no';
-cfg.trackconfig  = 'no';
 cfg.parameter    = 'avg';
 
 cfg.matrix = zeros(size(timelock1.avg));
@@ -373,7 +365,6 @@ try
   failed = false;
   cfg = [];
   cfg.showcallinfo = 'no';
-  cfg.trackconfig  = 'no';
   cfg.parameter    = 'avg';
   cfg.operation    = 'log10';
   cfg.matrix       = randn(3);
@@ -382,5 +373,3 @@ catch
   failed = true;
 end
 assert(failed, 'this should have failed');
-
-

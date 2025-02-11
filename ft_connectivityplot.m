@@ -51,7 +51,6 @@ ft_preamble init
 ft_preamble debug
 ft_preamble loadvar varargin
 ft_preamble provenance varargin
-ft_preamble trackconfig
 
 % the ft_abort variable is set to true or false in ft_preamble_init
 if ft_abort
@@ -73,8 +72,6 @@ cfg.xlim        = ft_getopt(cfg, 'xlim',      'maxmin');
 cfg.linecolor   = ft_getopt(cfg, 'linecolor', 'brgkywrgbkywrgbkywrgbkyw');
 cfg.linestyle   = ft_getopt(cfg, 'linestyle', '-');
 cfg.linewidth   = ft_getopt(cfg, 'linewidth', 0.5);
-cfg.visible     = ft_getopt(cfg, 'visible',   'on');
-cfg.renderer    = ft_getopt(cfg, 'renderer',  []); % let MATLAB decide on the default
 
 % check if the input data is valid for this function
 % ensure that the input is correct
@@ -146,7 +143,7 @@ elseif isnumeric(cfg.linecolor)
 end
 
 % ensure that the data in all inputs has the same channels, time-axis, etc.
-tmpcfg = keepfields(cfg, {'channel', 'showcallinfo', 'trackcallinfo', 'trackconfig', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo'});
+tmpcfg = keepfields(cfg, {'channel', 'showcallinfo', 'trackcallinfo', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo', 'checksize'});
 [varargin{:}] = ft_selectdata(tmpcfg, varargin{:});
 % restore the provenance information
 [cfg, varargin{:}] = rollback_provenance(cfg, varargin{:});
@@ -224,7 +221,7 @@ elseif ~isnumeric(cfg.ylim)
 else
   ymin = cfg.ylim(1);
   ymax = cfg.ylim(2);
-end  
+end
 cfg.ylim = [ymin ymax];
 
 % Get physical min/max range of z, which is the functional data:
@@ -398,7 +395,6 @@ set(gcf, 'NumberTitle', 'off');
 
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
-ft_postamble trackconfig
 ft_postamble previous varargin
 ft_postamble provenance
 ft_postamble savefig

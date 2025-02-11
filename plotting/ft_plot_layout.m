@@ -7,26 +7,31 @@ function ft_plot_layout(layout, varargin)
 % where the layout is a FieldTrip structure obtained from FT_PREPARE_LAYOUT.
 %
 % Additional options should be specified in key-value pairs and can be
-%   'chanindx'    = list of channels to plot (default is all)
-%   'point'       = yes/no
-%   'box'         = yes/no
-%   'label'       = yes/no
+%   'chanindx'    = logical vector or vector of indices. Which channels to plot (default is all)
+%   'point'       = 'yes' or 'no' (default 'yes'), plot markers for sensors, comment and scale
+%   'box'         = 'yes' or 'no' (default 'yes'), plot boxes around the sensors, comment and scale
+%   'label'       = 'yes' or 'no' (default 'yes'), plot the labels of the sensors, comment and scale
 %   'labeloffset' = offset of label from point (default = 0)
-%   'labelrotate' = scalar, vector with rotation angle (in degrees) per label (default = 0)
-%   'labelalignh' = string, or cell-array specifying the horizontal alignment of the text (default = 'center')
-%   'labelalignv' = string, or cell-array specifying the vertical alignment of the text (default = 'middle')
-%   'mask'        = yes/no
-%   'outline'     = yes/no
-%   'verbose'     = yes/no
-%   'pointsymbol' = string with symbol (e.g. 'o') - all three point options need to be used together
-%   'pointcolor'  = string with color (e.g. 'k')
-%   'pointsize'   = number indicating size (e.g. 8)
-%   'fontcolor'   = string, color specification (default = 'k')
-%   'fontsize'    = number, sets the size of the text (default = 10)
-%   'fontunits'   =
-%   'fontname'    =
-%   'fontweight'  =
-%   'interpreter' = string, 'none', 'tex' or 'latex'
+%   'labelrotate' = scalar or vector with rotation angle (in degrees) per label (default = 0)
+%   'labelalignh' = string or cell-array specifying the horizontal alignment of the text (default = 'center')
+%   'labelalignv' = string or cell-array specifying the vertical alignment of the text (default = 'middle')
+%   'mask'        = 'yes' or 'no' (default 'yes'), plot the interpolation area of the layout
+%   'outline'     = 'yes' or 'no' (default 'yes'), plot the outline of the layout (e.g. head and MEG helmet)
+%   'verbose'     = 'yes' or 'no' (default 'no'), print explanation of the figure to command window
+%   'fontcolor'   = string, text color specification (default = 'k')
+%   'fontsize'    = scalar, sets the size of the text (default = 10)
+%   'fontunits'   = string, units of the font size (default is the Matlab's session default)
+%   'fontname'    = string, font name (default is the Matlab's session default)
+%   'fontweight'  = scalar, sets the size of the text (default = 10)
+%   'interpreter' = string, 'none', 'tex' or 'latex' (default = 'tex')
+%
+% The following options control the markers of the sensors. If any is defined, the other two must be defined as well.
+% Further note that if 'chanindx' is used, the number of elements in each choice should correspond to the original 
+% labels in the layout, and not to the chosen subset.
+%   'pointsymbol' = string with symbol (e.g. 'o' or 'oooxxx')
+%   'pointcolor'  = string with color (e.g. 'k'), or an NX3 matrix of RGB values
+%   'pointsize'   = scalar or vector for marker size
+% The default marker is a blue dot sorrunded by a yellow circle.
 %
 % It is possible to plot the object in a local pseudo-axis (c.f. subplot), which is specfied as follows
 %   'hpos'        = horizontal position of the lower left corner of the local axes
@@ -36,7 +41,7 @@ function ft_plot_layout(layout, varargin)
 %
 % See also FT_PREPARE_LAYOUT, FT_PLOT_TOPO
 
-% Copyright (C) 2009, Robert Oostenveld
+% Copyright (C) 2009-2022, Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
@@ -55,8 +60,6 @@ function ft_plot_layout(layout, varargin)
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
 % $Id$
-
-ws = warning('on', 'MATLAB:divideByZero');
 
 % get the optional input arguments
 chanindx     = ft_getopt(varargin, 'chanindx',     []);
@@ -84,13 +87,13 @@ fontname    = ft_getopt(varargin, 'fontname',   get(0, 'defaulttextfontname'));
 fontweight  = ft_getopt(varargin, 'fontweight', get(0, 'defaulttextfontweight'));
 fontunits   = ft_getopt(varargin, 'fontunits',  get(0, 'defaulttextfontunits'));
 % these have to do with the font
-interpreter  = ft_getopt(varargin, 'interpreter', 'tex'); % none, tex or latex
+interpreter  = ft_getopt(varargin, 'interpreter', 'none'); % none, tex or latex
 
 % some stuff related to some refined label plotting
 labelrotate   = ft_getopt(varargin, 'labelrotate',  0);
 labelalignh   = ft_getopt(varargin, 'labelalignh',  'center');
 labelalignv   = ft_getopt(varargin, 'labelalignv',  'middle');
-labelcolor    = ft_getopt(varargin, 'labelcolor', 'k');
+labelcolor    = ft_getopt(varargin, 'labelcolor',   'k');
 
 % convert between true/false/yes/no etc. statements
 point   = istrue(point);
@@ -100,7 +103,6 @@ mask    = istrue(mask);
 outline = istrue(outline);
 verbose = istrue(verbose);
 
-% color management
 if ischar(pointcolor) && exist([pointcolor '.m'], 'file')
   pointcolor = eval(pointcolor);
 end
@@ -118,10 +120,21 @@ end
 
 % make a selection of the channels
 if ~isempty(chanindx)
+  nchan = length(layout.label);
   layout.pos    = layout.pos(chanindx,:);
   layout.width  = layout.width(chanindx);
   layout.height = layout.height(chanindx);
   layout.label  = layout.label(chanindx);
+  if numel(pointsymbol)==nchan
+    pointsymbol = pointsymbol(chanindx);
+  end
+  if numel(pointsize)==nchan
+    pointsize = pointsize(chanindx);
+  end
+  if size(pointcolor,1)==nchan
+    pointcolor = pointcolor(chanindx,:); % these are RGB triplets
+  end
+  clear nchan
 end
 
 % the units can be arbitrary (e.g. relative or pixels), so we need to compute the right scaling factor and offset
@@ -166,7 +179,27 @@ Lbl    = layout.label;
 
 if point
   if ~isempty(pointsymbol) && ~isempty(pointcolor) && ~isempty(pointsize) % if they're all non-empty, don't use the default
-    plot(X, Y, 'marker', pointsymbol, 'color', pointcolor, 'markersize', pointsize, 'linestyle', 'none');
+    ncol = size(pointcolor, 1);
+    nsym = numel(pointsymbol);
+    nsiz = numel(pointsize);
+    if (ncol == nsym) && (nsym == nsiz) && nsiz == 1 % One value for all
+      plot(X, Y, 'marker', pointsymbol, 'color', pointcolor, 'markersize', pointsize, 'linestyle', 'none');
+    else % One of the parameters has more than one value, loop
+    % Expand the values to match the number of plotted markers
+      if ncol == 1
+        pointcolor = repmat(pointcolor, numel(X), 1);
+      end
+      if nsym == 1
+        pointsymbol = repmat(pointsymbol, numel(X), 1);
+      end
+      if nsiz == 1
+        pointsize = repmat(pointsize, [numel(X) 1]);
+      end  
+    % Loop
+    for k = 1:numel(X)
+      plot(X(k), Y(k), 'marker', pointsymbol(k), 'markerfacecolor', pointcolor(k, :), 'markersize', pointsize(k), 'color', [0 0 0]);
+    end
+    end
   else
     plot(X, Y, 'marker', '.', 'color', 'b', 'linestyle', 'none');
     plot(X, Y, 'marker', 'o', 'color', 'y', 'linestyle', 'none');
@@ -237,12 +270,12 @@ if mask && isfield(layout, 'mask')
   end
 end
 
-axis auto
-axis equal
-axis off
+if isempty(width) && isempty(height)
+  axis auto
+  axis equal
+  axis off
+end
 
 if ~holdflag
   hold off
 end
-
-warning(ws); %revert to original state

@@ -26,7 +26,7 @@ function [elec_realigned] = ft_electroderealign(cfg, elec_original)
 % methods use a non-linear search to minimize the distance between the input sensor
 % positions and the projection of the electrodes on the head surface.
 %
-% PROJECT - This projects all electrodes to the nearest point on the
+% PROJECT - This projects each of the electrodes to the nearest point on the
 % head surface mesh.
 %
 % MOVEINWARD - This moves all electrodes inward according to their normals.
@@ -173,7 +173,6 @@ ft_preamble init
 ft_preamble debug
 ft_preamble loadvar    elec_original
 ft_preamble provenance elec_original
-ft_preamble trackconfig
 
 % the ft_abort variable is set to true or false in ft_preamble_init
 if ft_abort
@@ -236,16 +235,6 @@ cfg.headshape     = ft_getopt(cfg, 'headshape', []);     % for triangulated head
 if strcmp(cfg.method, 'fiducial') && isfield(cfg, 'warp') && ~isequal(cfg.warp, 'rigidbody')
   ft_warning('The method ''fiducial'' implies a rigid body tramsformation. See also http://bugzilla.fieldtriptoolbox.org/show_bug.cgi?id=1722');
   cfg.warp = 'rigidbody';
-end
-
-if isfield(cfg, 'headshape') && isa(cfg.headshape, 'config')
-  % convert the nested config-object back into a normal structure
-  cfg.headshape = struct(cfg.headshape);
-end
-
-if isfield(cfg, 'target') && isa(cfg.target, 'config')
-  % convert the nested config-object back into a normal structure
-  cfg.target = struct(cfg.target);
 end
 
 % the data can be passed as input arguments or can be read from disk
@@ -313,6 +302,9 @@ end
 if useheadshape
   % get the surface describing the head shape
   [headshape.pos, headshape.tri] = headsurface([], [], 'headshape', cfg.headshape);
+  if isfield(cfg.headshape, 'unit')
+    headshape.unit = cfg.headshape.unit;
+  end
   
   % ensure that the units are consistent with the electrodes
   headshape = ft_convert_units(headshape, elec.unit);
@@ -611,7 +603,7 @@ elseif strcmp(cfg.method, 'moveinward')
   elec.elecpos   = elec.elecpos(datsel,:);
   
   norm.label = elec.label;
-  norm.elecpos = moveinward(elec.elecpos, cfg.moveinward);
+  norm.elecpos = surface_shift(elec.elecpos, [], -cfg.moveinward); % move inward with the specified amount, hence negative
   
   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 elseif strcmp(cfg.method, 'mni')
@@ -727,7 +719,7 @@ switch cfg.method
       elec_realigned.coordsys = normalise.coordsys;
     else
       elec_realigned.coordsys = 'mni';
-    end  
+    end
   otherwise
     ft_error('unknown method');
 end
@@ -759,7 +751,6 @@ elec_realigned = ft_datatype_sens(elec_realigned);
 
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
-ft_postamble trackconfig
 ft_postamble previous   elec_original
 ft_postamble provenance elec_realigned
 ft_postamble history    elec_realigned

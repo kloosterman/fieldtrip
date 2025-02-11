@@ -16,8 +16,8 @@ function [cfg] = ft_clusterplot(cfg, stat)
 %   cfg.subplotsize             = layout of subplots ([h w], default [3 5])
 %   cfg.saveaspng               = string, filename of the output figures (default = 'no')
 %   cfg.visible                 = string, 'on' or 'off' whether figure will be visible (default = 'on')
-%   cfg.position                = location and size of the figure, specified as a vector of the form [left bottom width height]
-%   cfg.renderer                = string, 'opengl', 'zbuffer', 'painters', see MATLAB Figure Properties. If this function crashes, you should try 'painters'.
+%   cfg.position                = location and size of the figure, specified as [left bottom width height] (default is automatic)
+%   cfg.renderer                = string, 'opengl', 'zbuffer', 'painters', see RENDERERINFO (default is automatic, try 'painters' when it crashes)
 %   cfg.toi                     = vector, or 'all' (default) indicates which time
 %                                 points (or frequency bins) are to be plotted. If specified as 'all' only the
 %                                 data points with identified clusters are plotted
@@ -65,7 +65,6 @@ ft_preamble init
 ft_preamble debug
 ft_preamble loadvar stat
 ft_preamble provenance stat
-ft_preamble trackconfig
 
 % the ft_abort variable is set to true or false in ft_preamble_init
 if ft_abort
@@ -119,7 +118,7 @@ end
 cfgtopo = keepfields(cfg, {'parameter', 'marker', 'markersymbol', 'markercolor', 'markersize', 'markerfontsize', 'style', 'gridscale', 'interplimits', 'interpolation', 'contournum', 'colorbar', 'shading', 'zlim'});
 
 % prepare the layout, this only has to be done once
-tmpcfg = keepfields(cfg, {'layout', 'channel', 'rows', 'columns', 'commentpos', 'skipcomnt', 'scalepos', 'skipscale', 'projection', 'viewpoint', 'rotate', 'width', 'height', 'elec', 'grad', 'opto', 'showcallinfo', 'trackcallinfo', 'trackconfig', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo'});
+tmpcfg = keepfields(cfg, {'layout', 'channel', 'rows', 'columns', 'commentpos', 'skipcomnt', 'scalepos', 'skipscale', 'projection', 'viewpoint', 'rotate', 'width', 'height', 'elec', 'grad', 'opto', 'showcallinfo', 'trackcallinfo', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo', 'checksize'});
 cfgtopo.layout = ft_prepare_layout(tmpcfg, stat);
 cfgtopo.showcallinfo = 'no';
 cfgtopo.feedback = 'no';
@@ -446,7 +445,6 @@ set(gcf, 'NumberTitle', 'off');
 
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
-ft_postamble trackconfig
 ft_postamble previous stat
 ft_postamble provenance
 ft_postamble savefig

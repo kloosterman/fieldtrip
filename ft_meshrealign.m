@@ -3,32 +3,43 @@ function [mesh_realigned] = ft_meshrealign(cfg, mesh)
 % FT_MESHREALIGN rotates, translates and optionally scales a surface description of
 % the head or of the cortex. The different methods are described in detail below.
 %
-% INTERACTIVE - You can display the mesh surface together with axis coordinate
-% system, and manually (using the graphical user interface) adjust the rotation,
-% translation and scaling parameters.
+% INTERACTIVE - This displays the mesh surface together with an anatomical MRI, with
+% a head model, with electrodes, with gradiometers, with optodes, or simply with the
+% axis of the coordinate system, and you manually (using the graphical user
+% interface) adjust the rotation, translation and scaling parameters.
 %
 % FIDUCIAL - The coordinate system is updated according to the definition of the
 % coordinates of anatomical landmarks or fiducials that are specified in the
-% configuration. If the fiducials are not specified in the configurartion, you will
+% configuration. If the fiducials are not specified in the configuration, you will
 % have to click them in an interactive display of the mesh surface.
 %
 % Use as
 %   mesh = ft_meshrealign(cfg, mesh)
 % where the mesh input argument comes from FT_READ_HEADSHAPE or FT_PREPARE_MESH and
 % cfg is a configuration structure that should contain
-%
-%   cfg.method          = string, can be 'interactive' or fiducial' (default = 'interactive')
-%
-% The configuration can furthermore contain
+%   cfg.method         = string, can be 'interactive' or fiducial' (default = 'interactive')
 %   cfg.coordsys       = string specifying the origin and the axes of the coordinate
-%                        system. Supported coordinate systems are 'ctf', '4d', 'bti', 
+%                        system. Supported coordinate systems are 'ctf', '4d', 'bti',
 %                        'eeglab', 'neuromag', 'itab', 'yokogawa', 'asa', 'acpc',
 %                        and 'paxinos'. See http://tinyurl.com/ojkuhqz
+%
+% When cfg.method = 'fiducial' and cfg.coordsys is based on external anatomical
+% landmarks, as is common for EEG and MEG, the following can be used to specify the
+% voxel indices of the fiducials:
 %   cfg.fiducial.nas   = [x y z], position of nasion
 %   cfg.fiducial.lpa   = [x y z], position of LPA
 %   cfg.fiducial.rpa   = [x y z], position of RPA
+% The fiducials should be expressed in the same coordinates and units as the input
+% mesh. If the fiducials are not specified in the configuration, the mesh is
+% displayed and you have to click on the fidicuals.
 %
-% The fiducials should be expressed in the coordinates and units of the input mesh.
+% When cfg.method = 'fiducial' you can specify
+%   cfg.mri            = structure, see FT_READ_MRI
+%   cfg.headmodel      = structure, see FT_PREPARE_HEADMODEL
+%   cfg.elec           = structure, see FT_READ_SENS
+%   cfg.grad           = structure, see FT_READ_SENS
+%   cfg.opto           = structure, see FT_READ_SENS
+% If none of these is specified, the x-, y- and z-axes will be shown.
 %
 % To facilitate data-handling and distributed computing you can use
 %   cfg.inputfile   =  ...
@@ -40,7 +51,7 @@ function [mesh_realigned] = ft_meshrealign(cfg, mesh)
 %
 % See also FT_READ_HEADSHAPE, FT_PREPARE_MESH, FT_ELECTRODEREALIGN, FT_VOLUMEREALIGN
 
-% Copyrights (C) 2017-2021, Robert Oostenveld
+% Copyrights (C) 2017-2024, Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
@@ -75,7 +86,6 @@ ft_preamble init
 ft_preamble debug
 ft_preamble loadvar    mesh
 ft_preamble provenance mesh
-ft_preamble trackconfig
 
 % the ft_abort variable is set to true or false in ft_preamble_init
 if ft_abort
@@ -89,12 +99,19 @@ end
 mesh = ft_checkdata(mesh, 'datatype', 'mesh', 'feedback', 'yes', 'hasunit', 'yes', 'hascoordsys', 'no');
 
 % get the options
-cfg.method    = ft_getopt(cfg, 'method', 'interactive');
-cfg.coordsys  = ft_getopt(cfg, 'coordsys');
-cfg.fiducial = ft_getopt(cfg, 'fiducial');
+cfg.method       = ft_getopt(cfg, 'method', 'interactive');
+cfg.coordsys     = ft_getopt(cfg, 'coordsys');
+cfg.fiducial     = ft_getopt(cfg, 'fiducial');
 cfg.fiducial.nas = ft_getopt(cfg.fiducial, 'nas');
 cfg.fiducial.lpa = ft_getopt(cfg.fiducial, 'lpa');
 cfg.fiducial.rpa = ft_getopt(cfg.fiducial, 'rpa');
+cfg.mri          = ft_getopt(cfg, 'mri');
+cfg.headmodel    = ft_getopt(cfg, 'headmodel');
+cfg.headshape    = ft_getopt(cfg, 'headshape');
+cfg.elec         = ft_getopt(cfg, 'elec');
+cfg.grad         = ft_getopt(cfg, 'grad');
+cfg.opto         = ft_getopt(cfg, 'opto');
+cfg.meshstyle    = ft_getopt(cfg, 'meshstyle');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % the actual computation is done in the middle part
@@ -102,18 +119,56 @@ cfg.fiducial.rpa = ft_getopt(cfg.fiducial, 'rpa');
 
 % start with a copy
 mesh_realigned = keepfields(mesh, {'pos', 'tri', 'tet', 'hex', 'unit', 'line', 'edge', 'color', 'curv', 'sulc'});
+% ensure that its units are specified
+mesh_realigned = ft_determine_units(mesh_realigned);
 
 switch cfg.method
   case 'interactive'
-    
+
     tmpcfg = [];
-    tmpcfg.template.axes = 'yes';
-    tmpcfg.template.headshape.pos       = zeros(3,3); % three vertices
-    tmpcfg.template.headshape.tri       = [1 2 3];    % one triangle
-    tmpcfg.template.headshape.unit      = 'mm';
-    tmpcfg.template.headshape.coordsys  = cfg.coordsys;
-    tmpcfg.template.headshapestyle = {'vertexcolor', 'none', 'edgecolor', 'none', 'facecolor', 'none'};
+    tmpcfg.unit = mesh_realigned.unit;
+    tmpcfg.template = [];
+    if ~isempty(cfg.mri)
+      tmpcfg.template.mri = cfg.mri;
+      % show the MRI with the intersection of the mesh
+      tmpcfg.showalpha = 'no';
+      tmpcfg.showlight = 'no';
+      tmpcfg.template.mristyle = {'facealpha', 1};
+      tmpcfg.individual.headshapestyle = {'facealpha', 0}; % this is for the mesh that is to be moved/rotated/scaled
+    end
+    if ~isempty(cfg.headmodel)
+      tmpcfg.template.headmodel = cfg.headmodel;
+    end      
+    if ~isempty(cfg.elec)
+      tmpcfg.template.elec = cfg.elec;
+    end      
+    if ~isempty(cfg.grad)
+      tmpcfg.template.grad = cfg.grad;
+    end      
+    if ~isempty(cfg.opto)
+      tmpcfg.template.opto = cfg.opto;
+    end
+    if ~isempty(cfg.headshape)
+      tmpcfg.template.headshape = cfg.headshape;
+      tmpcfg.template.headshapestyle = {'vertexcolor', 'none', 'edgecolor', 'none', 'facecolor', [0.8 0.8 1], 'facealpha', 0.6};
+    end
+    if isempty(tmpcfg.template)
+      % only show the axes
+      tmpcfg.template.axes = 'yes';
+      tmpcfg.template.headshape.pos       = zeros(3,3);           % three vertices
+      tmpcfg.template.headshape.tri       = [1 2 3];              % one triangle
+      tmpcfg.template.headshape.unit      = mesh_realigned.unit;  % give it the same units
+      tmpcfg.template.headshape.coordsys  = cfg.coordsys;         % this is the target coordsys
+      tmpcfg.template.headshapestyle = {'vertexcolor', 'none', 'edgecolor', 'none', 'facecolor', 'none'};
+    end
+
+    % this is the mesh that is to be moved/rotated/scaled
     tmpcfg.individual.headshape = mesh_realigned;
+
+    % the mesh may have user-defined plotting style options
+    if ~isempty(cfg.meshstyle)
+      tmpcfg.individual.headshapestyle = cfg.meshstyle;
+    end
     tmpcfg = ft_interactiverealign(tmpcfg);
     % keep the homogenous transformation
     transform = tmpcfg.m;
@@ -220,13 +275,15 @@ switch cfg.method
     % compute the homogenous transformation
     transform = ft_headcoordinates(cfg.fiducial.nas, cfg.fiducial.lpa, cfg.fiducial.rpa, cfg.coordsys);
     
-    
   otherwise
     ft_error('unsupported method "%s"', cfg.method);
 end
 
 % update the positions
 mesh_realigned = ft_transform_geometry(transform, mesh_realigned);
+
+% store the transformation in the cfg, if it is to be used elsewhere
+cfg.transform = transform; 
 
 % assign the coordinate system
 if ~isempty(cfg.coordsys)
@@ -238,9 +295,7 @@ end
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % do the general cleanup and bookkeeping at the end of the function
-
 ft_postamble debug
-ft_postamble trackconfig
 ft_postamble previous   mesh
 ft_postamble provenance mesh_realigned
 ft_postamble history    mesh_realigned
@@ -457,7 +512,11 @@ else
       
       lab = 'crosshair';
       vox = [xi yi zi];
-      ind = sub2ind(mri.dim(1:3), round(vox(1)), round(vox(2)), round(vox(3)));
+      if all(isfinite(vox))
+        ind = sub2ind(mri.dim(1:3), round(vox(1)), round(vox(2)), round(vox(3)));
+      else
+        ind = nan;  % functional behavior of sub2ind has changed, giving an error with nan-input
+      end
       pos = ft_warp_apply(mri.transform, vox);
       switch opt.unit
         case 'mm'
@@ -474,7 +533,11 @@ else
     for i=1:length(opt.fidlabel)
       lab = opt.fidlabel{i};
       vox = opt.fiducial.(lab);
-      ind = sub2ind(mri.dim(1:3), round(vox(1)), round(vox(2)), round(vox(3)));
+      if all(isfinite(vox))
+        ind = sub2ind(mri.dim(1:3), round(vox(1)), round(vox(2)), round(vox(3)));
+      else
+        ind = nan; % functional behavior of sub2ind has changed, giving an error with nan-input
+      end
       pos = ft_warp_apply(mri.transform, vox);
       switch opt.unit
         case 'mm'

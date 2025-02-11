@@ -1,17 +1,21 @@
 function test_ft_headmodel_bemcp
 
-% MEM 12gb
+% MEM 10gb
 % WALLTIME 03:00:00
 % DEPENDENCY ft_headmodel_localspheres ft_prepare_localspheres
+% DATA no
 
 % to test actual numerical output of bemcp, rather than simply successful
 % running and correct inputs (which is what test_ft_prepare_headmodel tests).
+
+[ftver, ftpath] = ft_version;
+templatedir  = fullfile(ftpath, 'template');
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% method 1: segment MRI then compute bnd from it
 
 % read in the mri, this is already (non?)linearly aligned with MNI
-mri = ft_read_mri(dccnpath('/home/common/matlab/fieldtrip/template/headmodel/standard_mri.mat'));
+mri = ft_read_mri(fullfile(templatedir, 'headmodel', 'standard_mri.mat'));
 
 cfg = [];
 cfg.output = {'brain', 'skull', 'scalp'};
@@ -21,6 +25,14 @@ cfg = [];
 cfg.tissue = {'brain', 'skull', 'scalp'};
 cfg.numvertices = [1500 1000 500]; % these numbers later match the precomputed bnd
 mesh_new = ft_prepare_mesh(cfg, segmentedmri_new);
+
+% the segmentation is flawed: both the brain and the skull touch the base of the volume
+% hence the meshes of brain, skull and scalp touich each other at the base
+% as of approx 1 Feb 2023, ft_headmodel_bemcp checks for correctness of the meshes
+% shift the meshes to ensure that they don't touch or intersect
+mesh_new(1).pos(:,3) = mesh_new(1).pos(:,3) - 0; % brain
+mesh_new(2).pos(:,3) = mesh_new(2).pos(:,3) - 1; % skull
+mesh_new(3).pos(:,3) = mesh_new(3).pos(:,3) - 2; % scalp
 
 % I'm choosing 'mm' as units since that is what both the MRI and the
 % standard_bem are in already. Whether that is optimal for 'bemcp' is not
@@ -47,7 +59,7 @@ end
 %% method 2: compute bnd from segmented MRI
 
 % read in the already-segmented mri (in case its segmentation is better than above)
-segmentedmri = ft_read_mri(dccnpath('/home/common/matlab/fieldtrip/template/headmodel/standard_seg.mat'));
+segmentedmri = ft_read_mri(fullfile(templatedir, 'headmodel', 'standard_seg.mat'));
 
 cfg = [];
 cfg.tissue = [3 2 1]; % brain, skull, scalp
@@ -82,7 +94,7 @@ end
 
 % presumably the mesh that was used to create this 'standard' output from
 % dipoli should work (irrespective of segmentation above).
-load(dccnpath('/home/common/matlab/fieldtrip/template/headmodel/standard_bem.mat'));
+load(fullfile(templatedir, 'headmodel', 'standard_bem.mat'));
 vol_exist_dipoli = vol;
 mesh_exist = vol.bnd;
 mesh_exist = ft_convert_units(mesh_exist, 'mm');
@@ -109,7 +121,7 @@ vol_exist_bemcp = ft_prepare_headmodel(cfg, mesh_exist);
 load standard_sourcemodel3d8mm;
 sourcemodel = ft_convert_units(sourcemodel, 'mm');
 
-elec = ft_read_sens(dccnpath('/home/common/matlab/fieldtrip/template/electrode/standard_1005.elc'));
+elec = ft_read_sens(fullfile(templatedir, 'electrode', 'standard_1005.elc'));
 elec = ft_convert_units(elec, 'mm');
 
 % check for general spatial alignment

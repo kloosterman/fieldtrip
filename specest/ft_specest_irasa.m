@@ -62,6 +62,8 @@ polyorder = ft_getopt(varargin, 'polyorder', 1);
 verbose   = ft_getopt(varargin, 'verbose', true);
 fbopt     = ft_getopt(varargin, 'feedback');
 
+verbose = istrue(verbose); % if the calling function has 'yes'/'no'/etc
+
 % check output option
 if ~strcmp(output, {'fractal','original'})
   ft_error('The current version ft_specest_irasa outputs ''fractal'' or ''original'' power only. For more information about the update, see https://www.fieldtriptoolbox.org/example/irasa/');
@@ -99,7 +101,6 @@ end
 if round(pad * fsample) < subset_nsample
   ft_error('the padding that you specified is shorter than the data');
 end
-postpad    = ceil(round(pad * fsample) - subset_nsample);
 endnsample = round(pad * fsample);  % total number of samples of padded data
 endtime    = pad;                   % total time in seconds of padded data
 
@@ -134,7 +135,7 @@ if isnumeric(freqoiinput)
 end
 
 % determine whether tapers need to be recomputed
-current_argin = {output, time, postpad, freqoi}; % reasoning: if time and postpad are equal, it's the same length trial, if the rest is equal then the requested output is equal
+current_argin = {output, time, endnsample, freqoi}; % reasoning: if time and endnsample are equal, it's the same length trial, if the rest is equal then the requested output is equal
 if isequal(current_argin, previous_argin)
   % don't recompute tapers
   tap = previous_tap;
@@ -196,12 +197,14 @@ for itap = 1:ntaper(1)
         
         % compute auto-power of resampled data
         % upsampled
+        postpad = ceil(round(pad * fsample) - size(udat,2));
         tmp = fft(ft_preproc_padding(bsxfun(@times,udat,tap{ih,1}), padtype, 0, postpad), endnsample, 2);
         tmp = tmp(:,freqboi);
         tmp = tmp .* sqrt(2 ./ endnsample);
         tmp = abs(tmp).^2;
         upow = upow + tmp;
         % downsampled
+        postpad = ceil(round(pad * fsample) - size(ddat,2));
         tmp = fft(ft_preproc_padding(bsxfun(@times,ddat,tap{ih+nhset,1}), padtype, 0, postpad), endnsample, 2);
         tmp = tmp(:,freqboi);
         tmp = tmp .* sqrt(2 ./ endnsample);
@@ -229,6 +232,7 @@ for itap = 1:ntaper(1)
       subset_end = subset_start+subset_nsample-1;
       subdat = dat(:,subset_start:subset_end);
       % compute auto-power
+      postpad = ceil(round(pad * fsample) - size(subdat,2));
       tmp = fft(ft_preproc_padding(bsxfun(@times,subdat,tap(itap,:)), padtype, 0, postpad), endnsample, 2);
       tmp = tmp(:,freqboi);
       tmp = tmp .* sqrt(2 ./ endnsample);

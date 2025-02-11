@@ -75,7 +75,6 @@ ft_preamble init
 ft_preamble debug
 ft_preamble loadvar data source parcellation
 ft_preamble provenance data source parcellation
-ft_preamble trackconfig
 
 % the ft_abort variable is set to true or false in ft_preamble_init
 if ft_abort
@@ -90,7 +89,7 @@ end
 % store the original input representation of the data, this is used later on to convert it back
 isfreq = ft_datatype(data, 'freq');
 istlck = ft_datatype(data, 'timelock');  % this will be temporary converted into raw
-data   = ft_checkdata(data, 'datatype', {'raw', 'raw+comp', 'mvar' 'freq'}, 'feedback', 'yes');
+data   = ft_checkdata(data, 'datatype', {'raw+comp', 'raw', 'mvar' 'freq'}, 'feedback', 'yes');
 
 % ensure that the source input is a source structure , not a volume structure
 % this will also return source.filter, rather than source.avg.filter
@@ -141,7 +140,7 @@ end
 
 % select channels and trials of interest, by default this will select all channels and trials
 [i1, i2] = match_str(data.label, source.label);
-tmpcfg   = keepfields(cfg, {'trials', 'tolerance', 'showcallinfo', 'trackcallinfo', 'trackconfig', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo'});
+tmpcfg   = keepfields(cfg, {'trials', 'tolerance', 'showcallinfo', 'trackcallinfo', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo', 'checksize'});
 tmpcfg.channel = data.label(i1);
 data   = ft_selectdata(tmpcfg, data);
 % restore the provenance information
@@ -279,8 +278,9 @@ for i = 1:nvc
         if isfreq
           tmp = ft_checkdata(data, 'cmbstyle', 'fullfast');
           C   = tmp.crsspctrm;
-          if size(C,3)>1
-            C = mean(C,3);
+          if ndims(C)>2
+            siz = size(C);
+            C = mean(reshape(C, [siz(1) siz(2) prod(siz(3:end))]),3);
           end
         else
           tmpcfg = [];
@@ -398,7 +398,7 @@ if istlck
 end
 
 if usepos
-  brainordinate = keepfields(source, {'pos' 'dim' 'tri' 'transform' 'inside' 'unit'});
+  brainordinate = keepfields(source, {'pos', 'tri', 'dim', 'transform', 'unit', 'coordsys', 'inside'});
   brainordinate.index = zeros(npos, 1);
   brainordinate.index(indx) = indx;
   brainordinate.indexlabel  = data_vc.label; % FIXME this only works with one component per vc
@@ -409,7 +409,6 @@ data_vc.brainordinate = brainordinate;
 
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
-ft_postamble trackconfig
 ft_postamble previous   data source parcellation
 ft_postamble provenance data_vc
 ft_postamble history    data_vc

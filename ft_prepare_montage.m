@@ -8,7 +8,7 @@ function [montage, cfg] = ft_prepare_montage(cfg, data)
 %   montage = ft_prepare_montage(cfg, data)
 %
 % The configuration can contain the following fields:
-%   cfg.refmethod     = 'avg', 'comp', 'bipolar', 'laplace' (default = 'avg')
+%   cfg.refmethod     = 'avg', 'comp', 'bipolar', 'laplace', 'doublebanana', 'longitudinal', 'circumferential', 'transverse' (default = 'avg')
 %   cfg.implicitref   = string with the label of the implicit reference, or empty (default = [])
 %   cfg.refchannel    = cell-array with new EEG reference channel(s), this can be 'all' for a common average reference
 %   cfg.groupchans    = 'yes' or 'no', should channels be rereferenced in separate groups
@@ -36,7 +36,7 @@ function [montage, cfg] = ft_prepare_montage(cfg, data)
 %
 % See also FT_PREPROCESSING, FT_APPLY_MONTAGE
 
-% Copyright (C) 2017-2021, Robert Oostenveld
+% Copyright (C) 2017-2022, Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
@@ -79,7 +79,7 @@ hasdata = exist('data', 'var') && ~isempty(data);
 if ~hasdata
   data = struct([]);
 else
-  data = ft_checkdata(data, 'datatype', {'raw', 'raw+comp', 'timelock', 'timelock+comp'});
+  data = ft_checkdata(data, 'datatype', {'raw+comp', 'timelock+comp', 'raw', 'timelock'});
 end
 
 % do a sanity check for incompatible options which are used in ft_preprocessing and elsewhere
@@ -158,16 +158,16 @@ switch cfg.refmethod
       for i=1:numel(label)
         group(i) = regexp(label{i}, '^[a-zA-Z]+', 'match');
       end
-      group = unique(group, 'stable');
+      ugroup = unique(group, 'stable');
       
       tmpcfg = keepfields(cfg, {'refmethod', 'implicitref', 'refchannel', 'channel'});
       tmpcfg.groupchans = 'no';
       tmpcfg.showcallinfo = 'no';
       
-      groupmontage = cell(size(group));
-      for g = 1:length(group) % for each group of channels
+      groupmontage = cell(size(ugroup));
+      for g = 1:length(ugroup) % for each group of channels
         % select the channels within the group
-        tmpcfg.channel = label(startsWith(label, group{g}));
+        tmpcfg.channel = label(strcmp(group, ugroup{g}));
         groupmontage{g} = ft_prepare_montage(tmpcfg);
       end
       
@@ -177,7 +177,7 @@ switch cfg.refmethod
       montage2.labelnew = label(:);
       montage2.tra = eye(length(label));
       
-      for g = length(group):-1:1
+      for g = length(ugroup):-1:1
         % apply the montage for each groep (i.e., combine them), keep all other channels as they are
         % unused channels end up at the end, hence doing it in reverse order keeps the channel order consistent
         montage2 = ft_apply_montage(montage2, groupmontage{g}, 'keepunused', true);
@@ -260,6 +260,109 @@ switch cfg.refmethod
     
     % apply montage2 to montage1, the result is the combination of both
     montage = ft_apply_montage(montage1, montage2);
+    
+  case {'longitudinal', 'doublebanana'}
+    % see https://www.learningeeg.com/montages-and-technical-components
+    montage = [];
+    montage.labelold = {'Fp1', 'Fpz', 'Fp2', 'F7', 'F3', 'Fz', 'F4', 'F8', 'T3', 'C3', 'Cz', 'C4', 'T4', 'T5', 'P3', 'Pz', 'P4', 'T6', 'O1', 'Oz', 'O2'};
+    montage.labelnew = {
+      % left temporal chain
+      'Fp1-F7'
+      'F7-T3'
+      'T3-T5'
+      'T5-O1'
+      % left parasagittal chain
+      'Fp1-F3'
+      'F3-C3'
+      'C3-P3'
+      'P3-O1'
+      % central chain
+      'Fz-Cz'
+      'Cz-Pz'
+      % right parasagittal chain
+      'Fp2-F4'
+      'F4-C4'
+      'C4-P4'
+      'P4-O2'
+      % right temporal chain
+      'Fp2-F8'
+      'F8-T4'
+      'T4-T6'
+      'T6-O2'
+      };
+    % construct the montage from new channel labels
+    montage.tra = zeros(length(montage.labelnew), length(montage.labelold));
+    for i=1:length(montage.labelnew)
+      lab = split(montage.labelnew{i}, '-');
+      montage.tra(i, strcmp(montage.labelold, lab{1})) = +1;
+      montage.tra(i, strcmp(montage.labelold, lab{2})) = -1;
+    end
+    % do a sanity check on the montage
+    assert(all(sum(montage.tra, 2)==0));
+    assert(all(max(montage.tra, [], 2)==+1));
+    assert(all(min(montage.tra, [], 2)==-1));
+    
+  case 'circumferential'
+    % see https://www.learningeeg.com/montages-and-technical-components
+    montage = [];
+    montage.labelold = {'Fp1', 'Fpz', 'Fp2', 'F7', 'F3', 'Fz', 'F4', 'F8', 'T3', 'C3', 'Cz', 'C4', 'T4', 'T5', 'P3', 'Pz', 'P4', 'T6', 'O1', 'Oz', 'O2'};
+    montage.labelnew = {
+      'Fp1-F7'
+      'F7-T3'
+      'T3-T5'
+      'T5-O1'
+      'O1-O2'
+      'O2-T6'
+      'T6-T4'
+      'T4-F8'
+      'F8-Fp2'
+      'Fp2-Fp1'
+      };
+    % construct the montage from new channel labels
+    montage.tra = zeros(length(montage.labelnew), length(montage.labelold));
+    for i=1:length(montage.labelnew)
+      lab = split(montage.labelnew{i}, '-');
+      montage.tra(i, strcmp(montage.labelold, lab{1})) = +1;
+      montage.tra(i, strcmp(montage.labelold, lab{2})) = -1;
+    end
+    % do a sanity check on the montage
+    assert(all(sum(montage.tra, 2)==0));
+    assert(all(max(montage.tra, [], 2)==+1));
+    assert(all(min(montage.tra, [], 2)==-1));
+    
+  case 'transverse'
+    % this is inspired by https://doi.org/10.1016/j.earlhumdev.2011.08.008 but probably better documented elsewhere
+    % see https://www.learningeeg.com/montages-and-technical-components
+    % this particular implementation only considers the 10% distances
+    montage = [];
+    montage.labelold = {'Fp1', 'Fpz', 'Fp2', 'F7', 'F3', 'Fz', 'F4', 'F8', 'T3', 'C3', 'Cz', 'C4', 'T4', 'T5', 'P3', 'Pz', 'P4', 'T6', 'O1', 'Oz', 'O2'};
+    montage.labelnew = {
+      'Fp1-Fp2'
+      'F7-F3'
+      'F3-Fz'
+      'Fz-F4'
+      'F4-F8'
+      'T3-C3'
+      'C3-Cz'
+      'Cz-C4'
+      'C4-T4'
+      'T5-P3'
+      'P3-Pz'
+      'Pz-P4'
+      'P4-T6'
+      'O1-O2'
+      };
+    % construct the montage from new channel labels
+    montage.tra = zeros(length(montage.labelnew), length(montage.labelold));
+    for i=1:length(montage.labelnew)
+      lab = split(montage.labelnew{i}, '-');
+      montage.tra(i, strcmp(montage.labelold, lab{1})) = +1;
+      montage.tra(i, strcmp(montage.labelold, lab{2})) = -1;
+    end
+    % do a sanity check on the montage
+    assert(all(sum(montage.tra, 2)==0));
+    assert(all(max(montage.tra, [], 2)==+1));
+    assert(all(min(montage.tra, [], 2)==-1));
     
   otherwise
     error('unsupported refmethod=''%s''', cfg.refmethod);

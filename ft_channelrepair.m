@@ -19,8 +19,9 @@ function [data] = ft_channelrepair(cfg, data)
 %   cfg.order          = order of the polynomial interpolation (default = 4 for methods 'spline' and 'slap')
 %   cfg.senstype       = string, which type of data to repair. Can be 'meg', 'eeg' or 'nirs' (default is automatic)
 %
-% The weighted neighbour approach cannot be used reliably to repair multiple
-% bad channels that lie next to each other.
+% The weighted and average method are less reliable in case multiple bad channels lie
+% next to each other. In that case the bad channels will be removed from the
+% neighbours and not considered for interpolation.
 %
 % If you want to reconstruct channels that are absent in your data, those
 % channels may also be missing from the sensor definition (grad, elec or opto)
@@ -54,7 +55,7 @@ function [data] = ft_channelrepair(cfg, data)
 %
 % See also FT_MEGREALIGN, FT_MEGPLANAR, FT_PREPARE_NEIGHBOURS, FT_INTERPOLATENAN
 
-% Copyright (C) 2004-2009, Robert Oostenveld
+% Copyright (C) 2004-2024, Robert Oostenveld
 % Copyright (C) 2012-2013, Jörn M. Horschig, Jason Farquhar
 % Copyright (C) 2021, Jan-Mathijs Schoffelen
 
@@ -87,7 +88,6 @@ ft_preamble init
 ft_preamble debug
 ft_preamble loadvar data
 ft_preamble provenance data
-ft_preamble trackconfig
 
 % the ft_abort variable is set to true or false in ft_preamble_init
 if ft_abort
@@ -123,8 +123,16 @@ dtype = ft_datatype(data);
 % check if the input data is valid for this function
 data = ft_checkdata(data, 'datatype', 'raw', 'feedback', 'yes');
 
+% do a sanity check on the input configuration
+if ~isempty(cfg.missingchannel) && any(ismember(cfg.missingchannel, data.label))
+  ft_error('cfg.missingchannel is meant to specify channels that are NOT present in the input data structure, please use cfg.badchannel')
+end
+if ~isempty(cfg.missingchannel) && any(ismember(cfg.missingchannel, data.label))
+  ft_error('cfg.badchannel is meant to specify channels that ARE present in the input data structure, please use cfg.missingchannel ')
+end
+
 % select trials of interest
-tmpcfg = keepfields(cfg, {'trials', 'tolerance', 'showcallinfo', 'trackcallinfo', 'trackconfig', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo'});
+tmpcfg = keepfields(cfg, {'trials', 'tolerance', 'showcallinfo', 'trackcallinfo', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo', 'checksize'});
 data = ft_selectdata(tmpcfg, data);
 % restore the provenance information
 [cfg, data] = rollback_provenance(cfg, data);
@@ -144,7 +152,6 @@ if ismember(cfg.method, {'nan', 'average'})
 end
 
 if needsens
-  
   % sometimes the data can have both gradiometers, electrodes and/or optodes
   % but this function can only deal with one type of data at a time
   if isempty(cfg.senstype)
@@ -167,8 +174,8 @@ if needsens
   % this will prefer sens from cfg over sens from data
   sens = ft_fetch_sens(cfg, data);
   
-  % check if any of the channel positions contains NaNs; this happens when
-  % component data are backprojected to the sensor level
+  % check if any of the channel positions contains NaNs
+  % this happens when component data are backprojected to the sensor level
   if any(isnan(sens.chanpos(:)))
     ft_error('The channel positions contain NaNs; this prohibits correct behavior of the function. Please replace the input channel definition with one that contains valid channel positions');
   end
@@ -188,7 +195,7 @@ else
   isnirs = ft_senstype(data, 'opto');
   % determine the detailled type, e.g. ctf151 or neuromag122
   sensortype = ft_senstype(data);
-end
+end % if needsens
 
 if ismeg && ~any(strcmp(sensortype, {'ctf151', 'ctf275', 'bti148', 'bti248', 'babysquid74'}))
   % MEG systems with only magnetometers or axial gradiometers are easy, planar systems are not
@@ -218,6 +225,17 @@ interp.time    = data.time;
 
 switch cfg.method
   case {'weighted' 'average'}
+
+    for i=1:numel(cfg.neighbours)
+      sel = ismember(cfg.neighbours(i).neighblabel, cat(1, cfg.badchannel(:), cfg.missingchannel(:)));
+      if any(sel)
+        if ismember(cfg.neighbours(i).label, cat(1, cfg.badchannel(:), cfg.missingchannel(:)))
+          % only give the warning for the bad or missing channels, not for the good ones
+          ft_warning('removing bad or missing channel from the neighbour definition for "%s"', cfg.neighbours(i).label);
+        end
+        cfg.neighbours(i).neighblabel = cfg.neighbours(i).neighblabel(~sel);
+      end
+    end
     
     % first repair badchannels
     if ~isempty(cfg.badchannel)
@@ -261,7 +279,8 @@ switch cfg.method
         repair(k, list) = repair(k, list) ./ sum(repair(k, list));
       end
       
-      % use sparse matrix to speed up computations
+      % use a sparse matrix to speed up computations
+      % a side effect of the sparse multiplication is that nans on the bad channels are ignored
       repair = sparse(repair);
       
       % compute the missing data for each trial and set the ones that could not be reconstructed to nan
@@ -329,7 +348,8 @@ switch cfg.method
         repair(k, list) = repair(k, list) ./ sum(repair(k, list));
       end
       
-      % use sparse matrix to speed up computations
+      % use a sparse matrix to speed up computations
+      % a side effect of the sparse multiplication is that nans on the bad channels are ignored
       repair = sparse(repair);
       
       fprintf('\n');
@@ -348,7 +368,7 @@ switch cfg.method
     if ~isempty(cfg.badchannel) || ~isempty(cfg.missingchannel)
       fprintf('Spherical spline and surface Laplacian interpolation will treat bad and missing channels the same. Missing channels will be concatenated at the end of your data structure.\n');
     end
-    % subselect only those sensors that are in the data or in badchannel or missingchannel
+    % select only those sensors that are present in the data, in badchannel, or in missingchannel
     badchannels   = union(cfg.badchannel, cfg.missingchannel);
     sensidx       = ismember(sens.label, union(data.label, badchannels));
     label    = sens.label(sensidx);
@@ -381,7 +401,7 @@ switch cfg.method
     chanpos(missidx, :)                  = [];
     
     % select good channels only for interpolation
-    [goodchanlabels, goodindx] = setdiff(label, badchannels);
+    [goodchannels, goodindx] = setdiff(label, badchannels);
     allchans = false;
     if isempty(goodindx)
       goodindx = 1:numel(label);
@@ -479,7 +499,6 @@ end
 
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
-ft_postamble trackconfig
 ft_postamble previous data
 
 % rename the output variable to accomodate the savevar postamble

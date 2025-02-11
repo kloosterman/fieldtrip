@@ -1,12 +1,17 @@
-function test_tutorial_clusterpermutationtimelock(dataset)
+function test_tutorial_clusterpermutationtimelock(dataset, datadir)
 
-% MEM 3gb
+% MEM 1gb
 % WALLTIME 00:10:00
 % DEPENDENCY ft_timelockanalysis ft_multiplotER ft_singleplotER ft_timelockstatistics ft_topoplotER ft_clusterplot ft_megplanar ft_combineplanar
+% DATA public
 
-if nargin==0
-  dataset = dccnpath('/home/common/matlab/fieldtrip/data/Subject01.ds');
+if nargin<1 || isempty(dataset)
+  dataset = dccnpath('/project/3031000.02/external/download/test/ctf/Subject01.ds');
 end
+if nargin<2
+  datadir = dccnpath('/project/3031000.02/external/download/tutorial/cluster_permutation_timelock');
+end
+
 
 cfg                         = [];
 cfg.dataset                 = dataset;
@@ -164,6 +169,7 @@ for k = 1:20
    cfg.commentpos  = 'title';
    cfg.layout      = 'CTF151_helmet.mat';
    cfg.interactive = 'no';
+   cfg.figure      = 'gca';
    ft_topoplotER(cfg, raweffectFICvsFC);
 end
 
@@ -263,11 +269,12 @@ for k = 1:20
    cfg.comment = 'xlim';
    cfg.commentpos = 'title';
    cfg.layout = 'CTF151_helmet.mat';
+   cfg.figure = 'gca';
    ft_topoplotER(cfg, raweffectFICvsFC);
 end
 
 %% # Within-subjects experiments
-load(dccnpath('/home/common/matlab/fieldtrip/data/ftp/tutorial/cluster_permutation_timelock/ERF_orig'));
+load(fullfile(datadir, 'ERF_orig.mat'));
 
 % The configuration looks as follows:
 cfg         = [];
@@ -304,7 +311,7 @@ cfg.ivar   = 2;
 
 %% ## Plotting the results
 % load individual subject data
-load(dccnpath('/home/common/matlab/fieldtrip/data/ftp/tutorial/cluster_permutation_timelock/ERF_orig.mat'));
+load(fullfile(datadir, 'ERF_orig.mat'));
 
 % calculate the grand average for each condition
 cfg = [];
@@ -349,5 +356,6 @@ for k = 1:20
    cfg.comment    = 'xlim';
    cfg.commentpos = 'title';
    cfg.layout     = 'CTF151_helmet.mat';
+   cfg.figure     = 'gca';
    ft_topoplotER(cfg, GA_FICvsFC);
 end

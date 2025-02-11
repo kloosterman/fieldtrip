@@ -112,7 +112,7 @@ sens.type       = ft_senstype(sens);
 headmodel.type  = ft_headmodeltype(headmodel);
 
 if isfield(headmodel, 'unit') && isfield(sens, 'unit') && ~strcmp(headmodel.unit, sens.unit)
-  ft_error('inconsistency in the units of the volume conductor and the sensor array');
+  ft_error('inconsistency in the units of the volume conductor ("%s") and the sensor array ("%s")', headmodel.unit, sens.unit);
 end
 
 if ismeg && iseeg
@@ -125,7 +125,7 @@ elseif ~ismeg && ~iseeg
 elseif ismeg
 
   % always ensure that there is a linear transfer matrix for combining the coils into gradiometers
-  if ~isfield(sens, 'tra');
+  if ~isfield(sens, 'tra')
     Nchans = length(sens.label);
     Ncoils = size(sens.coilpos,1);
     if Nchans~=Ncoils
@@ -278,7 +278,7 @@ elseif ismeg
       % compute the surface normals for each vertex point
       if ~isfield(headmodel.bnd, 'nrm')
         fprintf('computing surface normals\n');
-        headmodel.bnd.nrm = normals(headmodel.bnd.pos, headmodel.bnd.tri);
+        headmodel.bnd.nrm = surface_normals(headmodel.bnd.pos, headmodel.bnd.tri);
       end
 
       % estimate center and radius
@@ -316,6 +316,37 @@ elseif ismeg
         cfg.solver.reduction   = headmodel.reduction;
         cfg.solver.intorderadd = headmodel.intorderadd;
         headmodel.meg_transfer = headmodel.driver.compute_meg_transfer_matrix(cfg);
+      end
+    
+    case 'interpolate'
+      % this is to allow moving leadfield files
+      if ~exist(headmodel.filename{1}, 'file')
+        for i = 1:length(headmodel.filename)
+          [p, f, x] = fileparts(headmodel.filename{i});
+          headmodel.filename{i} = fullfile(vpath, [f x]);
+        end
+      end
+
+      matchlab = isequal(sens.label, headmodel.sens.label);
+      matchpos = isequal(sens.coilpos, headmodel.sens.coilpos);
+      matchtra = (~isfield(sens, 'tra') && ~isfield(headmodel.sens, 'tra')) || (isfield(sens, 'tra') && isfield(headmodel.sens, 'tra') && isequal(sens.tra, headmodel.sens.tra));
+
+      if matchlab && matchpos && matchtra
+        % the input sensor array matches precisely with the forward model
+        % no further interpolation is needed
+      else
+        % interpolate the channels in the forward model to the desired channels
+        filename = tempname;
+        headmodel  = ft_headmodel_interpolate(filename, sens, headmodel);
+        % update the sensor array with the one from the volume conductor
+        sens = headmodel.sens;
+      end % if recomputing interpolation
+
+      % for the leadfield computations the @nifti object is used to map the image data into memory
+      ft_hastoolbox('spm8up', 1);
+      for i=1:length(headmodel.sens.label)
+        % map each of the leadfield files into memory
+        headmodel.chan{i} = nifti(headmodel.filename{i});
       end
 
     case 'simbio'
@@ -457,7 +488,7 @@ elseif iseeg
         if size(headmodel.mat,1)~=size(headmodel.mat,2) && size(headmodel.mat,1)==length(sens.elecpos)
           fprintf('electrode transfer and system matrix were already combined\n');
         else
-          fprintf('projecting electrodes on skin surface\n');
+          fprintf('projecting electrodes on triangulated skin surface\n');
           % compute linear interpolation from triangle vertices towards electrodes
           [el, prj] = project_elec(sens.elecpos, headmodel.bnd(headmodel.skin_surface).pos, headmodel.bnd(headmodel.skin_surface).tri);
           tra       = transfer_elec(headmodel.bnd(headmodel.skin_surface).pos, headmodel.bnd(headmodel.skin_surface).tri, el);

@@ -77,7 +77,6 @@ ft_preamble init
 ft_preamble debug
 ft_preamble loadvar varargin
 ft_preamble provenance varargin
-ft_preamble trackconfig
 
 % the ft_abort variable is set to true or false in ft_preamble_init
 if ft_abort
@@ -105,7 +104,7 @@ for i=1:length(varargin)
 end
 
 % check that these fields are identical for each input source
-checkfields = {'pos' 'dim' 'xgrid' 'ygrid' 'zgrid' 'transform' 'inside' 'outside'};
+checkfields = {'pos', 'tri', 'dim', 'transform', 'unit', 'coordsys', 'inside', 'xgrid', 'ygrid', 'zgrid'};
 for k = 1:numel(checkfields)
   tmpstr = checkfields{k};
   if isfield(varargin{1}, tmpstr)
@@ -120,7 +119,7 @@ for k = 1:numel(checkfields)
 end
 
 % ensure a consistent selection of the data over all inputs
-tmpcfg = keepfields(cfg, {'parameter', 'trials', 'latency', 'frequency', 'foilim', 'showcallinfo', 'trackcallinfo', 'trackconfig', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo'});
+tmpcfg = keepfields(cfg, {'parameter', 'trials', 'latency', 'frequency', 'foilim', 'showcallinfo', 'trackcallinfo', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo', 'checksize'});
 [varargin{:}] = ft_selectdata(tmpcfg, varargin{:});
 % restore the provenance information
 [cfg, varargin{:}] = rollback_provenance(cfg, varargin{:});
@@ -217,7 +216,7 @@ else
 end
 
 % the fields that describe the actual data need to be copied over from the input to the output
-grandavg = copyfields(varargin{1}, grandavg, {'pos', 'time', 'freq', 'dim', 'transform', 'inside', 'outside', 'unit', 'coordsys'});
+grandavg = copyfields(varargin{1}, grandavg, {'pos', 'tri', 'dim', 'transform', 'unit', 'coordsys', 'inside', 'time', 'freq'});
 
 % these fields might not be needed
 if ~contains(dimord, 'time'), grandavg = removefields(grandavg, 'time'); end
@@ -225,7 +224,6 @@ if ~contains(dimord, 'freq'), grandavg = removefields(grandavg, 'freq'); end
 
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
-ft_postamble trackconfig
 ft_postamble previous   varargin
 ft_postamble provenance grandavg
 ft_postamble history    grandavg

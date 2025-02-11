@@ -8,19 +8,20 @@ function [varargout] = ft_plot_box(position, varargin)
 % where the position of the box is specified as is [x1, x2, y1, y2].
 %
 % Optional arguments should come in key-value pairs and can include
-%   'facealpha'       = transparency value between 0 and 1
-%   'facecolor'       = color specification as [r g b] values or a string, for example 'brain', 'cortex', 'skin', 'red', 'r'
-%   'edgecolor'       = color specification as [r g b] values or a string, for example 'brain', 'cortex', 'skin', 'red', 'r'
-%   'tag'             = string, the name assigned to the object. All tags with the same name can be deleted in a figure, without deleting other parts of the figure.
+%   'facealpha'     = transparency value between 0 and 1
+%   'facecolor'     = color specification as [r g b] values or a string, for example 'brain', 'cortex', 'skin', 'red', 'r'
+%   'edgecolor'     = color specification as [r g b] values or a string, for example 'brain', 'cortex', 'skin', 'red', 'r'
+%   'parent'        = handle which is set as the parent for the plotted elements (default = [])
+%   'tag'           = string, the tag assigned to the plotted elements (default = '')
 %
 % It is possible to plot the object in a local pseudo-axis (c.f. subplot), which is specfied as follows
-%   'hpos'            = horizontal position of the center of the local axes
-%   'vpos'            = vertical position of the center of the local axes
-%   'width'           = width of the local axes
-%   'height'          = height of the local axes
-%   'hlim'            = horizontal scaling limits within the local axes
-%   'vlim'            = vertical scaling limits within the local axes
-%   'parent'          = handle which is set as the parent for all plots
+%   'hpos'          = horizontal position of the center of the local axes
+%   'vpos'          = vertical position of the center of the local axes
+%   'width'         = width of the local axes
+%   'height'        = height of the local axes
+%   'hlim'          = horizontal scaling limits within the local axes
+%   'vlim'          = vertical scaling limits within the local axes
+%   'parent'        = handle which is set as the parent for all plots (default = [])
 %
 % Example
 %   ft_plot_box([-1 1 2 3], 'facecolor', 'b')
@@ -28,7 +29,7 @@ function [varargout] = ft_plot_box(position, varargin)
 %
 % See also FT_PLOT_LINE, FT_PLOT_CROSSHAIR
 
-% Copyrights (C) 2009-2011, Robert Oostenveld
+% Copyrights (C) 2009-2022, Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
@@ -47,8 +48,6 @@ function [varargout] = ft_plot_box(position, varargin)
 %    along with FieldTrip. If not, see <http://www.gnu.org/licenses/>.
 %
 % $Id$
-
-ws = warning('on', 'MATLAB:divideByZero');
 
 % get the optional input arguments
 hpos        = ft_getopt(varargin, 'hpos');
@@ -147,6 +146,3 @@ end
 if nargout == 1
   varargout{1} = h;
 end
-
-warning(ws); % revert to original state
-

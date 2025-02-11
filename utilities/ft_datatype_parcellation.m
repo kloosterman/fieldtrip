@@ -7,7 +7,7 @@ function [parcellation] = ft_datatype_parcellation(parcellation, varargin)
 % A parcellation describes the tissue types for each of the surface elements.
 % Parcellations are often, but not always labeled. A parcellatoin can be used to
 % estimate the activity from MEG data in a known region of interest. A surface-based
-% atlas is basically a very detailled parcellation with an anatomical label for each
+% atlas is basically a very detailed parcellation with an anatomical label for each
 % vertex.
 %
 % An example of a surface based Brodmann parcellation looks like this
@@ -44,7 +44,8 @@ function [parcellation] = ft_datatype_parcellation(parcellation, varargin)
 %   - pos
 %
 % Optional fields:
-%   - tri, coordsys, unit
+%   - any field with dimensions that are consistent with pos
+%   - unit, coordsys, fid, tri
 %
 % Deprecated fields:
 %   - none

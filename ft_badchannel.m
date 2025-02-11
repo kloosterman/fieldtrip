@@ -1,4 +1,4 @@
-function cfg = ft_badchannel(cfg, data)
+function [cfg] = ft_badchannel(cfg, data)
 
 % FT_BADCHANNEL tries to identify bad channels in a MEG or EEG dataset. Different
 % methods are implemented to identify bad channels, these are largely shared with
@@ -23,18 +23,23 @@ function cfg = ft_badchannel(cfg, data)
 % of the neighbours.
 %
 % Use as
-%   cfg = ft_badchannel(cfg, data)
+%   [cfg] = ft_badchannel(cfg, data)
 % where the input data corresponds to the output from FT_PREPROCESSING.
 %
 % The configuration should contain
 %   cfg.metric        = string, describes the metric that should be computed in summary mode for each channel in each trial, can be
-%                       'var'       variance within each channel (default)
-%                       'min'       minimum value in each channel
-%                       'max'       maximum value in each channel
-%                       'maxabs'    maximum absolute value in each channel
-%                       'range'     range from min to max in each channel
-%                       'kurtosis'  kurtosis, i.e. measure of peakedness of the amplitude distribution
-%                       'zvalue'    mean and std computed over all time and trials, per channel
+%                       'var'          variance within each channel (default)
+%                       'std'          standard deviation within each channel
+%                       'db'           decibel value within each channel
+%                       'mad'          median absolute deviation within each channel
+%                       '1/var'        inverse variance within each channel
+%                       'min'          minimum value in each channel
+%                       'max'          maximum value in each channel
+%                       'maxabs'       maximum absolute value in each channel
+%                       'range'        range from min to max in each channel
+%                       'kurtosis'     kurtosis, i.e. measure of peakedness of the amplitude distribution
+%                       'zvalue'       mean and std computed over all time and trials, per channel
+%                       'neighbexpvar' relative variance explained by neighboring channels in each trial
 %   cfg.threshold     = scalar, the optimal value depends on the methods and on the data characteristics
 %   cfg.neighbours    = neighbourhood structure, see FT_PREPARE_NEIGHBOURS for details
 %   cfg.nbdetect      = 'any', 'most', 'all', 'median', see below (default = 'median')
@@ -58,12 +63,12 @@ function cfg = ft_badchannel(cfg, data)
 % You can also specify 'median', in which case the threshold is applied to the median
 % value over neighbours.
 %
-% See also FT_BADSEGMENT, FT_REJECTVISUAL, FT_CHANNELREPAIR
+% See also FT_BADSEGMENT, FT_BADDATA, FT_REJECTVISUAL, FT_CHANNELREPAIR
 
 % Undocumented options
 %   cfg.thresholdside = above or below
 
-% Copyright (C) 2021, Robert Oostenveld
+% Copyright (C) 2021-2024, Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
@@ -94,7 +99,6 @@ ft_preamble init
 ft_preamble debug
 ft_preamble loadvar data
 ft_preamble provenance
-ft_preamble trackconfig
 
 % the ft_abort variable is set to true or false in ft_preamble_init
 if ft_abort
@@ -120,7 +124,7 @@ cfg.feedback      = ft_getopt(cfg, 'feedback', 'no');
 cfg.thresholdside = ft_getopt(cfg, 'thresholdside', []); % the default depends on cfg.metric, see below
 
 if isempty(cfg.thresholdside)
-  if ismember(cfg.metric, {'var', 'std', 'max', 'maxabs', 'range', 'kurtosis', '1/var', 'zvalue', 'maxzvalue', 'neighbstdratio'})
+  if ismember(cfg.metric, {'var', 'std', 'db', 'mad', '1/var', 'max', 'maxabs', 'range', 'kurtosis', 'zvalue', 'maxzvalue', 'neighbstdratio'})
     % large positive values indicate an artifact, so check for values ABOVE the threshold
     cfg.thresholdside = 'above';
   elseif ismember(cfg.metric, {'min', 'neighbexpvar', 'neighbcorr'})
@@ -133,7 +137,7 @@ if isempty(cfg.thresholdside)
 end
 
 % select trials and channels of interest
-tmpcfg = keepfields(cfg, {'trials', 'channel', 'tolerance', 'latency', 'showcallinfo', 'trackcallinfo', 'trackconfig', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo'});
+tmpcfg = keepfields(cfg, {'trials', 'channel', 'tolerance', 'latency', 'showcallinfo', 'trackcallinfo', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo', 'checksize'});
 data   = ft_selectdata(tmpcfg, data);
 % restore the provenance information
 [cfg, data] = rollback_provenance(cfg, data);
@@ -147,8 +151,8 @@ if contains(cfg.metric, 'zvalue')
   runsum = zeros(nchan, 1);
   runss  = zeros(nchan, 1);
   runnum = 0;
-  for chan=1:ntrl
-    dat = preproc(data.trial{chan}, data.label, data.time{chan}, cfg.preproc);
+  for trl=1:ntrl
+    dat = preproc(data.trial{trl}, data.label, data.time{trl}, cfg.preproc);
     runsum = runsum + nansum(dat, 2);
     runss  = runss  + nansum(dat.^2, 2);
     runnum = runnum + sum(isfinite(dat), 2);
@@ -170,7 +174,8 @@ end
 
 for trl=1:ntrl
   % compute the artifact value for each channel in this trial
-  level = artifact_level(data.trial{trl}, cfg.metric, mval, sd, connectivity);
+  dat = preproc(data.trial{trl}, data.label, data.time{trl}, cfg.preproc);
+  level = artifact_level(dat, cfg.metric, mval, sd, connectivity);
   
   if isvector(level)
     % find channels with a value that exceeds the threshold
@@ -225,18 +230,16 @@ end % for each trial
 
 ft_info('identified %d out of %d channels as bad\n', sum(badchannel), length(badchannel));
 
+% keep track of bad channels
 cfg.badchannel = data.label(badchannel);
 
 % do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
-ft_postamble trackconfig
 ft_postamble previous data
 ft_postamble provenance
-ft_postamble hastoolbox
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % SUBFUNCTION
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function tf = most(x)
 tf = sum(x(:)==true)>(numel(x)/2);
-

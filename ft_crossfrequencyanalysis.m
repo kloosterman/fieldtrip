@@ -29,7 +29,7 @@ function crossfreq = ft_crossfrequencyanalysis(cfg, freqlow, freqhigh)
 % describing the pairs of channel combinations as
 %   {'chanlow01' 'chanhigh01'
 %    'chanlow01' 'chanhigh02'
-%    ... 
+%    ...
 %    'chanlow02' 'chanhigh01'
 %    'chanlow02' 'chanhigh02'
 %    ...
@@ -88,7 +88,6 @@ ft_preamble init
 ft_preamble debug
 ft_preamble loadvar freqlow freqhigh
 ft_preamble provenance freqlow freqhi
-ft_preamble trackconfig
 
 % the ft_abort variable is set to true or false in ft_preamble_init
 if ft_abort
@@ -274,7 +273,7 @@ switch cfg.method
     else
       dimord = 'chan_freqlow_freqhigh' ;
       crsspctrm = zeros(nchan,nlf,nhf);
-      cfcdatamean = reshape(mean(cfcdata,1),[nchan nlf nhf nbin 1]);
+      cfcdatamean = reshape(nanmean(cfcdata,1),[nchan nlf nhf nbin 1]);
       
       for k =1:nchan
         pac = squeeze(cfcdatamean(k,:,:,:));
@@ -302,7 +301,7 @@ switch cfg.method
       
     else
       dimord = 'chan_freqlow_freqhigh_phase' ;
-      crsspctrm = reshape(mean(cfcdata,1),[nchan nlf nhf nbin 1]);
+      crsspctrm = reshape(nanmean(cfcdata,1),[nchan nlf nhf nbin 1]);
       crsspctrm(isnan(crsspctrm)) = 0;
       
     end % if keeptrials
@@ -325,8 +324,8 @@ else
   crossfreq.label    = cfg.channel;
 end
 
+% do the general cleanup and bookkeeping at the end of the function
 ft_postamble debug
-ft_postamble trackconfig
 ft_postamble previous   freqlow freqhigh
 ft_postamble provenance crossfreq
 ft_postamble history    crossfreq

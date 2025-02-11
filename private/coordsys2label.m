@@ -7,6 +7,7 @@ function [labelx, labely, labelz] = coordsys2label(coordsys, format, both)
 %   [labelx, labely, labelz] = coordsys2label(coordsys, format, both)
 %
 % The scalar argument 'format' results in return values like these
+%   0) 'R'
 %   1) 'right'
 %   2) 'the right'
 %   3) '+X (right)'
@@ -17,7 +18,7 @@ function [labelx, labely, labelz] = coordsys2label(coordsys, format, both)
 %
 % See also FT_DETERMINE_COORDSYS, FT_PLOT_AXES, FT_HEADCOORDINATES, SETVIEWPOINT
 
-% Copyright (C) 2017-2021, Robert Oostenveld
+% Copyright (C) 2017-2024, Robert Oostenveld
 %
 % This file is part of FieldTrip, see http://www.fieldtriptoolbox.org
 % for the documentation and details.
@@ -37,7 +38,6 @@ function [labelx, labely, labelz] = coordsys2label(coordsys, format, both)
 %
 % $Id$
 
-
 % FIXME this function could also return a label for the origin
 % see http://bugzilla.fieldtriptoolbox.org/show_bug.cgi?id=3304
 
@@ -46,7 +46,7 @@ if ~isempty(coordsys) && ~strcmp(coordsys, 'unknown')
   
   % the coordsys consists of three letters for the direction of the positive axes
   % or of a string that relates to external software, an atlas or a template
-  if length(coordsys)==3 && length(intersect(coordsys, 'rlasif'))==3
+  if length(coordsys)==3 && length(intersect(coordsys, 'rlapis'))==3
     axis = 'XYZ';
     label = cell(1,3);
     for i=1:3
@@ -112,6 +112,17 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 switch format
+  case 0
+    % replace it with a single letter
+    old = {'posterior', 'anterior', 'left', 'right', 'inferior', 'superior'};
+    new = {'P', 'A', 'L', 'R', 'I', 'S'};
+    labelx{1} = new{strcmp(old, trim(labelx{1}))};
+    labelx{2} = new{strcmp(old, trim(labelx{2}))};
+    labely{1} = new{strcmp(old, trim(labely{1}))};
+    labely{2} = new{strcmp(old, trim(labely{2}))};
+    labelz{1} = new{strcmp(old, trim(labelz{1}))};
+    labelz{2} = new{strcmp(old, trim(labelz{2}))};
+
   case 1
     % remove the -, +, X, Y, Z , (, ) and space
     labelx{1} = trim(labelx{1});
@@ -139,7 +150,7 @@ switch format
     
   case 3
     % keep it as it is
-    
+
   otherwise
     ft_error('unsupported option')
 end

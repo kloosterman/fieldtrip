@@ -1,8 +1,9 @@
 function test_ft_getopt
 
-% MEM 2gb
+% MEM 1gb
 % WALLTIME 00:10:00
 % DEPENDENCY ft_getopt
+% DATA no
 
 success = true;
 
@@ -13,16 +14,6 @@ success = success && isequal(ft_getopt({'key1', 'val1'}, 'key2', 'default'), 'de
 
 cfg      = [];
 cfg.key1 = 'val1';
-success = success && isequal(ft_getopt(cfg, 'key1'), 'val1');
-success = success && isequal(ft_getopt(cfg, 'key2'), []);
-success = success && isequal(ft_getopt(cfg, 'key2', 'default'), 'default');
-success = success && isequal(ft_getopt(cfg, 'key2', 'default'), 'default');
-success = success && isequal(ft_getopt({'key1', []}, 'key1'), []);
-success = success && isequal(ft_getopt({'key1', []}, 'key1', 'default'), 'default');
-
-cfg      = [];
-cfg.key1 = 'val1';
-cfg = config(cfg);
 success = success && isequal(ft_getopt(cfg, 'key1'), 'val1');
 success = success && isequal(ft_getopt(cfg, 'key2'), []);
 success = success && isequal(ft_getopt(cfg, 'key2', 'default'), 'default');

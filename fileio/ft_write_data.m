@@ -30,6 +30,7 @@ function ft_write_data(filename, dat, varargin)
 %   matlab
 %   homer_nirs
 %   snirf
+%   csv
 %
 % For EEG data, the input data is assumed to be scaled in microvolt.
 % For NIRS data, the input data is assumed to represent optical densities.
@@ -594,9 +595,6 @@ switch dataformat
     if ~isempty(evt)
       ft_error('writing events is not supported');
     end
-    if nchans~=1
-      ft_error('this format only supports single channel continuous data');
-    end
     
     [path, file, ext] = fileparts(filename);
     filename = fullfile(path, [file '.' dataformat]);
@@ -608,7 +606,7 @@ switch dataformat
         options = {'BitsPerSample', nbits};
     end % switch
     
-    audiowrite(filename, dat, hdr.Fs, options{:});
+    audiowrite(filename, dat', hdr.Fs, options{:});
     
   case 'plexon_nex'
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -848,7 +846,7 @@ switch dataformat
     tra_t = tra'; % transpose tra matrix to get indices of wavelength by row (thus by channel)
     wl_idx = find(tra_t>0);
     all_wavelengths = hdr.opto.wavelength(tra_t(wl_idx));
-    split = median(all_wavelengths);
+    split = nanmedian(all_wavelengths);
     WL1.values = all_wavelengths(all_wavelengths<split);
     WL2.values = all_wavelengths(all_wavelengths>split);
     WL1.nominal = round(median(WL1.values),-1);
@@ -957,6 +955,25 @@ switch dataformat
     % save .snirf file
     snirf.Save(filename)
     
+  case 'csv'
+    % write the data matrix as a comma-separated text file, where each row is a time slice
+    % if a label is present in the header, the first header line contains the labels of the columns    
+    if ~isempty(hdr) && isfield(hdr, 'label')
+      label = hdr.label;
+    else
+      label = {};
+    end
+
+    if isempty(label)
+      dat = array2table(dat');
+      writelabel = false;
+    else
+      dat = array2table(dat', 'VariableNames', label);
+      writelabel = true;
+    end
+    writetable(dat, filename, 'WriteVariableNames', writelabel);
+
+
   otherwise
     ft_error('unsupported data format');
 end % switch dataformat

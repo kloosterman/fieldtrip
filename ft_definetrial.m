@@ -11,7 +11,7 @@ function [cfg] = ft_definetrial(cfg)
 % where the configuration structure should contain
 %   cfg.trialdef       = structure with the details of trial definition, see below
 %   cfg.trialfun       = string with the function name, see below (default = 'ft_trialfun_general')
-%   cfg.representation = [], 'numeric' or 'table', determines how the trial definition is returned (default is automatic)
+%   cfg.representation = 'numeric' or 'table', determines how the trial definition is returned (default is automatic)
 % and furthermore
 %   cfg.dataset        = string with the filename
 % or
@@ -60,7 +60,7 @@ function [cfg] = ft_definetrial(cfg)
 % Besides the required three columns in the trial definition "trl" that represent
 % start, end and offset, it can have contain additional columns . These additional
 % columns can be used by a custom trialfun to provide  information about each trial,
-% such as trigger codes, response latencies, trial type and response correctness.
+% such as trigger codes, response latencies, trial type, and response correctness.
 % After FT_PREPROCESSING these additional columns of the "trl" matrix will be
 % represented in the "trialinfo" field.
 %
@@ -121,7 +121,6 @@ ft_defaults
 ft_preamble init
 ft_preamble debug
 ft_preamble provenance
-ft_preamble trackconfig
 
 % the ft_abort variable is set to true or false in ft_preamble_init
 if ft_abort
@@ -158,7 +157,7 @@ end % default based on eventvalue
 
 % set the default options
 cfg.trialfun        = ft_getopt(cfg, 'trialfun', 'ft_trialfun_general'); % the default might already be set above
-cfg.representation  = ft_getopt(cfg, 'representation'); % this can be empty, 'numeric' or 'table'
+cfg.representation  = ft_getopt(cfg, 'representation'); % this can 'numeric' or 'table'
 
 if isfield(cfg, 'trl')
   % the trial definition is already part of the configuration
@@ -242,6 +241,5 @@ if size(trl,1)>0
 end
 
 % do the general cleanup and bookkeeping at the end of the function
-ft_postamble trackconfig
 ft_postamble provenance
 ft_postamble debug

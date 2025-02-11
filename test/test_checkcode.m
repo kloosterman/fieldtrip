@@ -1,8 +1,9 @@
 function test_checkcode
 
 % WALLTIME 00:20:00
-% MEM 2gb
+% MEM 1gb
 % DEPENDENCY
+% DATA no
 
 % see http://bugzilla.fieldtriptoolbox.org/show_bug.cgi?id=3309
 
@@ -210,7 +211,8 @@ end
 fid = fopen(filename, 'r');
 str = fread(fid, [1, inf], 'char=>char');
 bool = true; % this is the return value when all is fine
-bool = bool & isempty(regexp(str, '\[~', 'once'));
+bool = bool & isempty(regexp(str, '\[~ ', 'once'));
+bool = bool & isempty(regexp(str, '\[~,', 'once'));
 bool = bool & isempty(regexp(str, '~\]', 'once'));
 bool = bool & isempty(regexp(str, ', *~ *,', 'once'));
 fclose(fid);

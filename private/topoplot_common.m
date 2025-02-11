@@ -312,7 +312,7 @@ for indx=1:Ndata
   end
   
   % time and/or frequency should NOT be selected and averaged here, since a singleplot might follow in interactive mode
-  tmpcfg = keepfields(cfg, {'channel', 'trials', 'showcallinfo', 'trackcallinfo', 'trackconfig', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo'});
+  tmpcfg = keepfields(cfg, {'channel', 'trials', 'showcallinfo', 'trackcallinfo', 'trackusage', 'trackdatainfo', 'trackmeminfo', 'tracktimeinfo', 'checksize'});
   if hasrpt
     tmpcfg.avgoverrpt = 'yes';
   else
@@ -363,9 +363,12 @@ for indx=1:Ndata
     bivariate_common(cfg, varargin{:});
     return
   end
-  
+ 
   % Apply channel-type specific scaling
-  tmpcfg = keepfields(cfg, {'parameter', 'chanscale', 'ecgscale', 'eegscale', 'emgscale', 'eogscale', 'gradscale', 'magscale', 'megscale', 'mychan', 'mychanscale'});
+  fn = fieldnames(cfg);
+  fn = setdiff(fn, {'skipscale', 'showscale', 'gridscale'}); % these are for the layout and plotting, not for CHANSCALE_COMMON
+  fn = fn(endsWith(fn, 'scale') | startsWith(fn, 'mychan') | strcmp(fn, 'channel') | strcmp(fn, 'parameter'));
+  tmpcfg = keepfields(cfg, fn);
   data = chanscale_common(tmpcfg, data);
   
   
@@ -568,6 +571,11 @@ for indx=1:Ndata
     if ~isempty(msk)
       msk(nanInds) = [];
     end
+  elseif strcmp(cfg.interpolatenan, 'no') && any(nanInds)
+    if isempty(msk)
+      msk = true(size(dat));
+    end
+    msk(nanInds) = false;
   end
   
   % Set ft_plot_topo specific options
@@ -711,7 +719,11 @@ for indx=1:Ndata
   
   % Set colour axis
   if ~strcmp(cfg.style, 'blank')
-    caxis([zmin zmax]);
+    if zmin==zmax
+      clim([zmin-eps zmax+eps]);
+    else
+      clim([zmin zmax]);
+    end
   end
   
   % Plot colorbar
@@ -763,6 +775,9 @@ for indx=1:Ndata
     info.(ident).dataname    = dataname;
     info.(ident).cfg         = cfg;
     info.(ident).commenth    = comment_handle;
+    if exist('linecolor', 'var')
+      info.(ident).linecolor   = linecolor;
+    end
     if ~isfield(info.(ident),'datvarargin')
       info.(ident).datvarargin = varargin(1:Ndata); % add all datasets to figure
     end
@@ -791,6 +806,8 @@ ident       = get(gca, 'tag');
 info        = guidata(gcf);
 cfg         = info.(ident).cfg;
 datvarargin = info.(ident).datvarargin;
+linecolor   = ft_getopt(info.(ident), 'linecolor', lineattributes_common(cfg, datvarargin{:}));
+
 if ~isempty(label)
   cfg = removefields(cfg, 'inputfile');       % the reading has already been done and varargin contains the data
   cfg.baseline = 'no';                        % make sure the next function does not apply a baseline correction again
@@ -807,6 +824,9 @@ if ~isempty(label)
   % ensure that the new figure appears at the same position
   cfg.figure = 'yes';
   cfg.position = get(gcf, 'Position');
+  
+  selchan = match_str(datvarargin{1}.label, cfg.channel);
+  cfg.linecolor = linecolor(selchan, :, :); % make a subselection for the correct inheritance of the line colors
   ft_singleplotER(cfg, datvarargin{:});
 end
 
